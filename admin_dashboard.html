@@ -6,7 +6,6 @@
     <title>Admin Dashboard | Smart College Portal</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -130,37 +129,6 @@
         </main>
     </div>
 
-    <script src="js/main.js"></script>
-    <script>
-        const deptCtx = document.getElementById('deptChart').getContext('2d');
-        new Chart(deptCtx, {
-            type: 'bar',
-            data: {
-                labels: ['CSE_DEPT', 'ECE_DEPT', 'ME_DEPT', 'CE_DEPT'],
-                datasets: [{
-                    label: 'Attendance %',
-                    data: [85, 79, 81, 84],
-                    backgroundColor: 'rgba(37, 99, 235, 0.75)',
-                    borderRadius: 6
-                }]
-            },
-            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
-        });
-
-        const branchCtx = document.getElementById('branchChart').getContext('2d');
-        new Chart(branchCtx, {
-            type: 'bar',
-            data: {
-                labels: ['CSE', 'CSE-AI', 'AIML', 'ECE', 'ME', 'CE'],
-                datasets: [{
-                    label: 'Attendance %',
-                    data: [85, 83, 82, 79, 81, 84],
-                    backgroundColor: 'rgba(22, 163, 74, 0.75)',
-                    borderRadius: 6
-                }]
-            },
-            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
-        });
-    </script>
+    <script src="js/portal.js"></script>
 </body>
 </html>

@@ -34,10 +34,6 @@
             background-color: #eef2ff; border: 2px solid #cbd5e1; border-radius: 14px;
             padding: 0.8rem; width: 100%; color: #0f172a;
         }
-        .demo-otp-banner {
-            background-color: #dbeafe; border: 1px dashed #2563eb;
-            border-radius: 12px; padding: 1rem; margin: 1.25rem 0; font-size: 0.9rem; color: #1e3a8a;
-        }
         .btn-verify {
             background: #16a34a; color: #ffffff; border-radius: 12px; padding: 0.85rem;
             font-weight: 700; font-size: 1rem; width: 100%; border: none; cursor: pointer;
@@ -54,14 +50,9 @@
             A 6-digit verification OTP was dispatched to your college email and mobile number.
         </p>
 
-        <div class="demo-otp-banner">
-            <i class="fa-solid fa-mobile-screen-button"></i> <strong>Demo Verification OTP:</strong>
-            <span style="font-size: 1.25rem; font-weight: 800; color: #1d4ed8; display: block; margin-top: 4px;">849201</span>
-        </div>
-
         <form id="otpForm">
             <div class="form-group" style="margin-top: 1.25rem;">
-                <input type="text" id="otp_input" class="otp-input" maxlength="6" value="849201" required autofocus>
+                <input type="text" id="otp_input" class="otp-input" maxlength="6" required autofocus>
             </div>
 
             <button type="submit" class="btn-verify">
@@ -75,13 +66,6 @@
     </div>
 </div>
 
-<script src="js/main.js"></script>
-<script>
-    document.getElementById('otpForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        alert('Success! Email & Phone verified via OTP! Account activated. Redirecting to Sign In...');
-        window.location.href = 'login.html';
-    });
-</script>
+    <script src="js/portal.js"></script>
 </body>
 </html>

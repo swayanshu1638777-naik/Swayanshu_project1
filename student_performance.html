@@ -6,7 +6,6 @@
     <title>Performance Analysis | Smart College Portal</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -51,24 +50,6 @@
         </main>
     </div>
 
-    <script src="js/main.js"></script>
-    <script>
-        const ctx = document.getElementById('progressChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['CT-1', 'CT-2', 'Assignment', 'Mid-Term', 'ESE'],
-                datasets: [{
-                    label: 'Score %',
-                    data: [85, 90, 88, 84, 87],
-                    borderColor: '#2563eb',
-                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                    fill: true,
-                    tension: 0.3
-                }]
-            },
-            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
-        });
-    </script>
+    <script src="js/portal.js"></script>
 </body>
 </html>

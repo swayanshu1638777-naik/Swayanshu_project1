@@ -1,0 +1,13 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/node_modules
+backend/data
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+**/coverage

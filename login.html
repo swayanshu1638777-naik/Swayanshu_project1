@@ -41,10 +41,6 @@
             font-weight: 700; font-size: 1rem; width: 100%; border: none; cursor: pointer;
             display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1rem;
         }
-        .demo-credentials {
-            background-color: #f8fafc; border: 1px solid #e2e8f0;
-            border-radius: 14px; padding: 1.1rem; margin-top: 1.5rem; font-size: 0.875rem;
-        }
     </style>
 </head>
 <body>
@@ -88,36 +84,12 @@
             Don't have a student account? <a href="register.html" style="color: #2563eb; font-weight: 700; text-decoration: none;"><i class="fa-solid fa-user-plus"></i> Register Here</a>
         </div>
 
-        <div class="demo-credentials">
-            <h4 style="margin-bottom: 0.4rem; color: #1e293b;"><i class="fa-solid fa-key" style="color: #2563eb;"></i> Demo Credentials</h4>
-            <p><strong>Admin:</strong> admin@ssipmt.com / admin123</p>
-            <p><strong>Teacher:</strong> prof.sharma@ssipmt.com / teacher123</p>
-            <p><strong>Student:</strong> 101 / rahul@ssipmt.com / student123</p>
-        </div>
     </div>
     <p style="margin: 1rem 0 0; text-align: center; font-size: 0.9rem;">
         <a href="index.html" style="color: #2563eb; font-weight: 600;">← Back to campus home</a>
     </p>
 </div>
 
-<script src="js/main.js"></script>
-<script>
-    const roleFromLink = new URLSearchParams(window.location.search).get('role');
-    if (['Admin', 'Teacher', 'Student'].includes(roleFromLink)) {
-        document.getElementById('role').value = roleFromLink;
-    }
-
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const role = document.getElementById('role').value;
-        if (role === 'Admin') {
-            window.location.href = 'admin_dashboard.html';
-        } else if (role === 'Teacher') {
-            window.location.href = 'teacher_dashboard.html';
-        } else if (role === 'Student') {
-            window.location.href = 'student_dashboard.html';
-        }
-    });
-</script>
+    <script src="js/portal.js"></script>
 </body>
 </html>

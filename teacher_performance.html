@@ -6,7 +6,6 @@
     <title>Class Performance | Smart College Portal</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -51,22 +50,6 @@
         </main>
     </div>
 
-    <script src="js/main.js"></script>
-    <script>
-        const ctx = document.getElementById('marksChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['CT-1', 'CT-2', 'Assignment', 'Mid-Term', 'ESE'],
-                datasets: [{
-                    label: 'Class Average %',
-                    data: [85, 78, 92, 80, 84],
-                    backgroundColor: 'rgba(37, 99, 235, 0.75)',
-                    borderRadius: 6
-                }]
-            },
-            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
-        });
-    </script>
+    <script src="js/portal.js"></script>
 </body>
 </html>

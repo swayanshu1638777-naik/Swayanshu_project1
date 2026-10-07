@@ -1,0 +1,51 @@
+name: Backend tests
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "*.html"
+      - "css/**"
+      - "js/**"
+      - "assets/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "compose.yaml"
+      - "deploy/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "*.html"
+      - "css/**"
+      - "js/**"
+      - "assets/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "compose.yaml"
+      - "deploy/**"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Build production container
+        working-directory: .
+        run: docker build --tag smart-college-portal:test .
