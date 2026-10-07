@@ -95,10 +95,18 @@
             <p><strong>Student:</strong> 101 / rahul@ssipmt.com / student123</p>
         </div>
     </div>
+    <p style="margin: 1rem 0 0; text-align: center; font-size: 0.9rem;">
+        <a href="index.html" style="color: #2563eb; font-weight: 600;">← Back to campus home</a>
+    </p>
 </div>
 
 <script src="js/main.js"></script>
 <script>
+    const roleFromLink = new URLSearchParams(window.location.search).get('role');
+    if (['Admin', 'Teacher', 'Student'].includes(roleFromLink)) {
+        document.getElementById('role').value = roleFromLink;
+    }
+
     document.getElementById('loginForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const role = document.getElementById('role').value;
