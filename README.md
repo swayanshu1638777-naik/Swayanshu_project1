@@ -51,12 +51,14 @@ accounts are not overwritten; production startup refuses a database containing
 the known development demo accounts. The container binds to `127.0.0.1` on the
 host; put an HTTPS reverse proxy in front of it.
 
-The frontend API base defaults to `http://localhost:5000/api`. Override it by
-setting `window.COLLEGE_PORTAL_API_BASE` before `js/portal.js` loads, by saving
-`collegePortalApiBase` in local storage. API endpoints are not configurable
-through page URLs. Authenticated pages retain the JWT in browser local storage,
-verify the current user and role, and redirect to the appropriate dashboard
-when the session is missing or invalid.
+When the frontend is served from `localhost` or `127.0.0.1` on a port other
+than `5000`, it sends API requests to `http://<host>:5000/api`. When the backend
+serves the frontend on port `5000`, requests use the same-origin `/api` path.
+Override the API base by setting `window.COLLEGE_PORTAL_API_BASE` before
+`js/portal.js` loads, or by saving `collegePortalApiBase` in local storage. API
+endpoints are not configurable through page URLs. Authenticated pages retain
+the JWT in browser local storage, verify the current user and role, and redirect
+to the appropriate dashboard when the session is missing or invalid.
 
 Student self-registration requires positive department, branch, semester, and
 section IDs provided by the college. The backend currently protects its
@@ -69,5 +71,5 @@ Administrators can manage departments, branches, semesters, sections, and
 subjects from the reference-data pages. Signed-in users can change their
 password from the expandable Account security panel on portal pages.
 
-The landing page's full-screen temple world is rendered locally from
-`assets/temple/temple-world.html` and its companion Three.js assets.
+The landing page's Living Green scene uses local Three.js and its companion
+assets under `assets/inner-green-assets/`.

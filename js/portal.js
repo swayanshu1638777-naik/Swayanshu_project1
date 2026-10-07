@@ -1,8 +1,9 @@
 (function () {
   'use strict';
 
-  const localApiBase = ['localhost', '127.0.0.1'].includes(location.hostname) && location.port === '8080'
-    ? 'http://localhost:5000/api'
+  const isLocalHost = ['localhost', '127.0.0.1'].includes(location.hostname);
+  const localApiBase = isLocalHost && location.port !== '5000'
+    ? `http://${location.hostname}:5000/api`
     : '/api';
   const API_BASE = (window.COLLEGE_PORTAL_API_BASE
     || localStorage.getItem('collegePortalApiBase')
