@@ -49,16 +49,26 @@ assignment boundaries. Authenticated users can change their password through
 Student signup uses `POST /api/auth/register` followed by
 `POST /api/auth/verify-otp`. Registration requires an `@ssipmt.com` email and
 a six-digit code. In development, the code is written to the backend console.
-In production, configure `OTP_DELIVERY_URL` to a trusted HTTPS delivery
-webhook. It receives a JSON body with `email`, `phone`, `code`, and
-`expiresInMinutes`; optionally configure `OTP_DELIVERY_TOKEN` for bearer
-authentication. Registration is disabled in production without a delivery
-webhook. OTP values are stored hashed, expire, and are limited to five attempts.
+Production Compose sends email through Resend using `OTP_DELIVERY_PROVIDER=resend`,
+`RESEND_API_KEY`, and `OTP_FROM_EMAIL` on a verified sending domain. The existing
+custom HTTPS webhook remains available with `OTP_DELIVERY_PROVIDER=webhook`,
+`OTP_DELIVERY_URL`, and optional `OTP_DELIVERY_TOKEN`. OTP values are stored
+hashed, expire, and are limited to five attempts. Login, registration, and OTP
+verification requests are additionally rate-limited by client IP. When running
+behind the Compose Caddy service set `TRUST_PROXY=1`; only do this when exactly
+one trusted proxy is in front of Express.
 
 ## API areas
 
 - `/api/admin`: department, branch, student, teacher, subject and teaching
   assignment management; `/catalog` returns form lookup data.
+- `/api/admin/data`: administrator-only database record counts, searchable and
+  filterable paginated lists, individual record details, validated updates,
+  appropriate academic-record deletion, and filtered CSV export. Available
+  resources are students, teachers, departments, branches, semesters, sections,
+  subjects, assignments, attendance, assessments, and marks. The public
+  `/api/catalog` endpoint exposes only academic lookup fields needed by student
+  registration.
 - `/api/assignments`: role-scoped class assignments and student rosters.
 - `/api/attendance`: attendance queries and bulk upsert for a class/date.
 - `/api/assessments` and `/api/marks`: create assessments, enter marks, and
@@ -88,8 +98,28 @@ accounts already present in an existing database. Rotate existing accounts
 through the application’s password-change flow before production use. Do not
 commit `.env` or production secrets; configure them in the deployment platform.
 
-The default SQLite location is relative to the backend folder. Run tests with:
+The default SQLite location is relative to the backend folder. Production
+Compose mounts `/app/data` on `portal-data`; this volume survives container
+recreation and must not be removed during routine updates. Run tests with:
 
 ```powershell
 npm test
 ```
+
+Create a consistent online SQLite backup using SQLite's backup API:
+
+```powershell
+npm run backup
+```
+
+By default this creates a timestamped file in `data/backups/` under the backend
+directory. The production Compose backup service uses the same SQLite backup
+API, writes to persistent `/app/backups`, uploads to the configured S3-compatible
+bucket, and applies `BACKUP_RETENTION_DAYS` to local and remote copies. It runs
+immediately and repeats every `BACKUP_INTERVAL_HOURS`. Use a private bucket and
+restricted credentials with list/upload/delete access. Download an object with
+an S3-compatible client, stop both `portal` and `backup-service`, verify
+`PRAGMA integrity_check`, then replace `/app/data/college_portal.sqlite` and
+restart. The project README documents the full Compose restore command. Store
+off-host copies and periodically rehearse restoring to a test volume. Never
+serve or expose the SQLite file itself.

@@ -20,6 +20,9 @@
   let currentAssignments = [];
   let currentRoster = [];
   let currentAssessments = [];
+  let dataRows = [];
+  let dataResource = 'students';
+  let dataQuery = new URLSearchParams();
 
   const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -28,6 +31,7 @@
   const pageTitle = (title, subtitle, content) => {
     const main = document.querySelector('.content-body');
     main.style.visibility = 'visible';
+    main.removeAttribute('aria-busy');
     main.innerHTML = `
       <div class="page-header"><div><h1 class="page-title">${esc(title)}</h1>
       <p class="page-subtitle">${esc(subtitle || '')}</p></div></div>
@@ -61,6 +65,7 @@
     } catch (error) {
       throw new Error(`Cannot reach the API at ${API_BASE}. Check that the backend is running and its CORS settings allow this page.`);
     }
+
     const text = response.status === 204 ? '' : await response.text();
     let result = null;
     if (text) {
@@ -159,23 +164,50 @@
     if (['Admin', 'Teacher', 'Student'].includes(role)) form.elements.role.value = role;
   }
 
-  function registrationPage() {
+  async function registrationPage() {
     const form = document.getElementById('regForm');
     if (!form) return;
     const messageNode = document.createElement('div');
     messageNode.className = 'portal-auth-message';
     messageNode.setAttribute('role', 'status');
     form.after(messageNode);
-    const catalogInputs = ['department_id', 'branch_id', 'semester_id', 'section_id'];
-    catalogInputs.forEach((name) => {
-      const control = form.elements[name];
-      if (!control) return;
-      control.innerHTML = '';
-      control.outerHTML = `<input class="styled-input" type="number" min="1" step="1" name="${name}" required>`;
-      const replacement = form.elements[name];
-      replacement.previousElementSibling && replacement.previousElementSibling.setAttribute('for', name);
-      replacement.insertAdjacentHTML('beforebegin', `<small class="form-hint">Enter the ${name.replace('_id', '')} ID provided by your college.</small>`);
-    });
+    let catalog;
+    try {
+      catalog = await api('/catalog');
+    } catch (error) {
+      messageNode.textContent = error.message;
+      messageNode.classList.add('error');
+      form.querySelector('[type="submit"]').disabled = true;
+      return;
+    }
+    const departmentControl = form.elements.department_id;
+    const branchControl = form.elements.branch_id;
+    const semesterControl = form.elements.semester_id;
+    const sectionControl = form.elements.section_id;
+    const fill = (control, options, label, placeholder) => {
+      control.innerHTML = `<option value="">${esc(placeholder)}</option>${options.map((item) =>
+        `<option value="${esc(item.id)}">${esc(label(item))}</option>`).join('')}`;
+    };
+    fill(departmentControl, catalog.departments, (item) => `${item.name} (${item.code})`, 'Select department');
+    fill(semesterControl, catalog.semesters, (item) => item.name, 'Select semester');
+    branchControl.disabled = true;
+    sectionControl.disabled = true;
+    const fillBranches = () => {
+      const branches = catalog.branches.filter((item) => String(item.department_id) === departmentControl.value);
+      fill(branchControl, branches, (item) => `${item.name} (${item.code})`, 'Select branch');
+      branchControl.disabled = branches.length === 0;
+      fillSections();
+    };
+    const fillSections = () => {
+      const matching = catalog.sections.filter((item) =>
+        String(item.branch_id) === branchControl.value && String(item.semester_id) === semesterControl.value);
+      fill(sectionControl, matching, (item) => `Section ${item.name}`, 'Select section');
+      sectionControl.disabled = matching.length === 0;
+    };
+    branchControl.addEventListener('change', fillSections);
+    semesterControl.addEventListener('change', fillSections);
+    departmentControl.addEventListener('change', fillBranches);
+    fillBranches();
     form.elements.password.minLength = 8;
     form.elements.password.placeholder = 'Minimum 8 characters';
     form.addEventListener('submit', async (event) => {
@@ -421,6 +453,86 @@
     form.elements.branch_id.value = branchId;
   }
 
+  const dataResourceConfig = {
+    students: { title: 'Students', columns: ['roll_no', 'name', 'email', 'branch', 'semester', 'section', 'is_active'], fields: [['name', 'Full name', 'text'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['department_id', 'Department', 'department'], ['branch_id', 'Branch', 'branch'], ['semester_id', 'Semester', 'semester'], ['section_id', 'Section', 'section'], ['is_active', 'Account status', 'boolean']] },
+    teachers: { title: 'Teachers', columns: ['username', 'name', 'email', 'department', 'is_active'], fields: [['name', 'Full name', 'text'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['department_id', 'Department', 'department'], ['is_active', 'Account status', 'boolean']] },
+    departments: { title: 'Departments', columns: ['id', 'name', 'code'], fields: [['name', 'Name', 'text'], ['code', 'Code', 'text']] },
+    branches: { title: 'Branches', columns: ['id', 'name', 'code', 'department'], fields: [['name', 'Name', 'text'], ['code', 'Code', 'text'], ['department_id', 'Department', 'department']] },
+    semesters: { title: 'Semesters', columns: ['id', 'number', 'name'], fields: [['number', 'Semester number', 'number'], ['name', 'Name', 'text']] },
+    sections: { title: 'Sections', columns: ['id', 'name', 'branch', 'semester'], fields: [['name', 'Name', 'text'], ['branch_id', 'Branch', 'branch'], ['semester_id', 'Semester', 'semester']] },
+    subjects: { title: 'Subjects', columns: ['id', 'code', 'name', 'branch', 'semester'], fields: [['code', 'Code', 'text'], ['name', 'Name', 'text'], ['branch_id', 'Branch', 'branch'], ['semester_id', 'Semester', 'semester']] },
+    assignments: { title: 'Teaching assignments', columns: ['id', 'teacher', 'subject_code', 'subject', 'branch', 'semester', 'section'], fields: [['teacher_id', 'Teacher', 'teacher'], ['subject_id', 'Subject', 'subject'], ['section_id', 'Section', 'section']] },
+    attendance: { title: 'Attendance', columns: ['date', 'roll_no', 'student', 'subject_code', 'subject', 'branch', 'section', 'status'], fields: [['date', 'Date', 'date'], ['status', 'Status', 'attendance-status']] },
+    assessments: { title: 'Assessments', columns: ['date', 'subject_code', 'subject', 'branch', 'section', 'title', 'max_marks'], fields: [['title', 'Title', 'text'], ['max_marks', 'Maximum marks', 'number'], ['date', 'Assessment date', 'date']] },
+    marks: { title: 'Marks', columns: ['date', 'roll_no', 'student', 'subject_code', 'assessment', 'score', 'max_marks', 'percentage'], fields: [['score', 'Score', 'number']] },
+  };
+  const dataTabs = Object.keys(dataResourceConfig);
+
+  function dataFilterControls(resource, catalog) {
+    const supportsBranch = ['students', 'branches', 'sections', 'subjects', 'assignments', 'attendance', 'assessments', 'marks'].includes(resource);
+    const supportsSemester = ['students', 'sections', 'subjects', 'assignments'].includes(resource);
+    const supportsStatus = ['students', 'teachers', 'attendance'].includes(resource);
+    const supportsDate = ['attendance', 'assessments', 'marks'].includes(resource);
+    const statusOptions = resource === 'attendance'
+      ? '<option value="">All statuses</option><option>Present</option><option>Absent</option><option>Late</option><option>Excused</option>'
+      : '<option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>';
+    return `${input('Search records', 'q', 'search', false, 'Search by name, code, roll number...')}
+      ${supportsBranch ? select('Branch', 'branch_id', escOptions(catalog.branches, 'id', (item) =>
+        `${item.name} (${item.code})`, 'All branches'), false) : ''}
+      ${supportsSemester ? select('Semester', 'semester_id', escOptions(catalog.semesters, 'id', (item) =>
+        item.name, 'All semesters'), false) : ''}
+      ${supportsStatus ? select('Status', 'status', statusOptions, false) : ''}
+      ${supportsDate ? input('From date', 'date_from', 'date', false) + input('To date', 'date_to', 'date', false) : ''}
+      ${select('Rows per page', 'limit', '<option>25</option><option>50</option><option>100</option>', false)}`;
+  }
+
+  async function adminDataManagement() {
+    const params = new URLSearchParams(location.search);
+    dataResource = dataResourceConfig[params.get('resource')] ? params.get('resource') : 'students';
+    dataQuery = new URLSearchParams();
+    for (const key of ['q', 'branch_id', 'semester_id', 'status', 'date_from', 'date_to', 'limit']) {
+      if (params.has(key)) dataQuery.set(key, params.get(key));
+    }
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    const limit = Math.min(100, Math.max(1, Number(dataQuery.get('limit')) || 25));
+    const [counts, catalog, result] = await Promise.all([
+      api('/admin/data/counts'),
+      loadCatalog(),
+      api(`/admin/data/${dataResource}?${new URLSearchParams({ ...Object.fromEntries(dataQuery), page, limit })}`),
+    ]);
+    dataRows = result.data;
+    const config = dataResourceConfig[dataResource];
+    const tabs = dataTabs.map((item) => `<a class="btn ${item === dataResource ? 'btn-primary' : 'btn-secondary'}"
+      href="admin_database.html?resource=${encodeURIComponent(item)}">${esc(dataResourceConfig[item].title)}
+      <span class="data-count">${esc(counts.data[item] || 0)}</span></a>`).join('');
+    const supplementalCounts = `Administrator accounts: ${esc(counts.data.administrators || 0)} ·
+      Pending registrations: ${esc(counts.data['pending registrations'] || 0)}`;
+    const rows = dataRows.map((row) => `<tr><td><input type="checkbox" class="data-select" value="${esc(row.id)}" aria-label="Select ${esc(config.title)} record ${esc(row.id)}"></td>
+      ${config.columns.map((key) => `<td>${key === 'is_active' ? (row[key] ? 'Active' : 'Inactive') : esc(row[key])}</td>`).join('')}
+      <td>${actionButton('view-data-record', row.id, 'Details')}${actionButton('edit-data-record', row.id, 'Edit')}
+      ${['attendance', 'marks', 'assessments'].includes(dataResource) ? actionButton('delete-data-record', row.id, 'Delete', 'btn-danger') : ''}</td></tr>`).join('');
+    const headers = ['Select', ...config.columns.map((key) => key.replaceAll('_', ' ')), 'Actions'];
+    const pageCount = Math.max(1, result.pages);
+    pageTitle('Data Management', 'Browse and safely manage records stored in the application database.', `
+      <section class="card"><div class="data-tabs" aria-label="Database tables">${tabs}</div>
+        <p class="data-help">${supplementalCounts}</p>
+        <div class="stats-grid">${stat('Record count', result.total, 'fa-database')}
+          ${stat('Database tables', dataTabs.length, 'fa-table')}</div>
+        <form data-action="filter-database" class="form-grid data-filters">
+          ${dataFilterControls(dataResource, catalog)}<button class="btn btn-primary" type="submit">Search / Filter</button>
+          <button class="btn btn-secondary" type="button" data-action="export-selected">Export selected (page)</button>
+          <button class="btn btn-secondary" type="button" data-action="export-database">Export filtered CSV</button></form>
+        <p class="data-help">Showing ${result.total ? (result.page - 1) * result.limit + 1 : 0}–${Math.min(result.page * result.limit, result.total)} of ${result.total} records. CSV export includes all records matching the current filters.</p>
+        ${table(headers, rows)}
+        <div class="data-pagination"><button class="btn btn-secondary" type="button" data-action="database-page" data-page="${Math.max(1, page - 1)}" ${page <= 1 ? 'disabled' : ''}>Previous</button>
+          <span>Page ${result.page} of ${pageCount}</span>
+          <button class="btn btn-secondary" type="button" data-action="database-page" data-page="${Math.min(pageCount, page + 1)}" ${page >= pageCount ? 'disabled' : ''}>Next</button></div>
+      </section><section class="card" id="data-record-panel"><h2 class="card-title">Record details</h2><p>Select Details or Edit on a record to inspect it.</p></section>`);
+    const form = document.querySelector('[data-action="filter-database"]');
+    for (const [key, value] of dataQuery) if (form.elements[key]) form.elements[key].value = value;
+    if (form.elements.limit) form.elements.limit.value = String(limit);
+  }
+
   async function studentDashboard() {
     const [data, attendance] = await Promise.all([api('/dashboard/student'), api('/attendance')]);
     const grouped = new Map();
@@ -650,6 +762,7 @@
         admin_students: adminStudents,
         admin_teachers: adminTeachers,
         admin_reports: adminReports,
+        admin_database: adminDataManagement,
         student_dashboard: studentDashboard,
         student_attendance: studentAttendance,
         student_marks: studentMarks,
@@ -675,6 +788,27 @@
     const action = form.dataset.action;
     const fields = Object.fromEntries(new FormData(form).entries());
     let result;
+    if (action === 'filter-database') {
+      const query = new URLSearchParams(Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== '')));
+      location.href = `admin_database.html?${new URLSearchParams({ resource: dataResource, ...Object.fromEntries(query) })}`;
+      return;
+    }
+    if (action === 'update-data-record') {
+      const resource = fields.resource;
+      const id = fields.id;
+      delete fields.resource;
+      delete fields.id;
+      const config = dataResourceConfig[resource];
+      for (const [key, , type] of config.fields) {
+        if (type === 'number' && fields[key] !== '') fields[key] = Number(fields[key]);
+        if (type === 'boolean') fields[key] = fields[key] === '1';
+        if (type === 'tel' && fields[key] === '') fields[key] = null;
+      }
+      await api(`/admin/data/${resource}/${encodeURIComponent(id)}`, { method: 'PATCH', body: fields });
+      await adminDataManagement();
+      message('Record updated.');
+      return;
+    }
     if (action === 'filter-students') {
       const query = new URLSearchParams(Object.fromEntries(Object.entries(fields).filter(([, value]) => value)));
       location.href = `admin_students.html${query.size ? `?${query}` : ''}`;
@@ -798,9 +932,119 @@
     location.href = `teacher_marks.html?assignment_id=${encodeURIComponent(assignmentId)}&assessment_id=${encodeURIComponent(assessmentId)}`;
   }
 
+  function downloadCsv(filename, records) {
+    const columns = Object.keys(records[0] || {});
+    const cell = (value) => {
+      let text = value == null ? '' : String(value);
+      if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const contents = [columns.map(cell).join(','), ...records.map((record) =>
+      columns.map((column) => cell(record[column])).join(','))].join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\uFEFF', contents], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function downloadFilteredDataCsv() {
+    const query = new URLSearchParams(Object.fromEntries(dataQuery));
+    query.set('format', 'csv');
+    query.set('all', 'true');
+    const token = localStorage.getItem(TOKEN_KEY);
+    const headers = { Accept: 'text/csv' };
+    headers.Authorization = ['Bearer', token].join(' ');
+    const response = await fetch(`${API_BASE}/admin/data/${dataResource}?${query}`, { headers });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || `CSV export failed (${response.status}).`);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${dataResource}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function clickAction(button) {
     const action = button.dataset.action;
     const id = Number(button.dataset.id);
+    if (action === 'database-page') {
+      const params = new URLSearchParams(location.search);
+      params.set('page', button.dataset.page);
+      location.href = `admin_database.html?${params}`;
+      return;
+    }
+    if (action === 'view-data-record' || action === 'edit-data-record') {
+      const result = await api(`/admin/data/${dataResource}/${id}`);
+      const record = result.data;
+      const panel = document.getElementById('data-record-panel');
+      if (action === 'view-data-record') {
+        panel.innerHTML = `<h2 class="card-title">${esc(dataResourceConfig[dataResource].title)} record #${esc(id)}</h2>
+          <dl class="data-record-details">${Object.entries(record).map(([key, value]) =>
+            `<div><dt>${esc(key.replaceAll('_', ' '))}</dt><dd>${esc(value == null ? '—' : value)}</dd></div>`).join('')}</dl>`;
+      } else {
+        const fields = dataResourceConfig[dataResource].fields.map(([key, label, type]) => {
+          const value = record[key] == null ? '' : record[key];
+          const referenceLists = {
+            department: [catalog.departments, (item) => `${item.name} (${item.code})`],
+            branch: [catalog.branches, (item) => `${item.name} (${item.code})`],
+            semester: [catalog.semesters, (item) => item.name],
+            section: [catalog.sections, (item) => {
+              const branch = catalog.branches.find((candidate) => candidate.id === item.branch_id);
+              const semester = catalog.semesters.find((candidate) => candidate.id === item.semester_id);
+              return `${branch ? branch.code : ''} ${semester ? semester.name : ''} · Section ${item.name}`;
+            }],
+            subject: [catalog.subjects, (item) => `${item.code} — ${item.name}`],
+            teacher: [catalog.teachers, (item) => `${item.name} (${item.email})`],
+          };
+          if (referenceLists[type]) {
+            const [items, labelFor] = referenceLists[type];
+            const options = `<option value="">Select ${esc(label.toLowerCase())}</option>${items.map((item) =>
+              `<option value="${esc(item.id)}" ${String(item.id) === String(value) ? 'selected' : ''}>${esc(labelFor(item))}</option>`).join('')}`;
+            return select(label, key, options, true);
+          }
+          if (type === 'boolean') {
+            return select(label, key, `<option value="1" ${value ? 'selected' : ''}>Active</option><option value="0" ${!value ? 'selected' : ''}>Inactive</option>`, true);
+          }
+          if (type === 'attendance-status') {
+            return select(label, key, ['Present', 'Absent', 'Late', 'Excused'].map((status) =>
+              `<option ${value === status ? 'selected' : ''}>${status}</option>`).join(''), true);
+          }
+          return input(label, key, type === 'tel' ? 'tel' : type, true, '', value);
+        }).join('');
+        panel.innerHTML = `<h2 class="card-title">Edit ${esc(dataResourceConfig[dataResource].title)} record #${esc(id)}</h2>
+          <form data-action="update-data-record"><input type="hidden" name="resource" value="${esc(dataResource)}">
+            <input type="hidden" name="id" value="${esc(id)}"><div class="form-grid">${fields}</div>${submitButton('Save changes')}</form>`;
+      }
+      message('');
+      return;
+    }
+    if (action === 'delete-data-record') {
+      const warning = dataResource === 'assessments'
+        ? 'Delete this assessment and all marks recorded for it? This cannot be undone.'
+        : `Delete this ${dataResource === 'marks' ? 'mark' : 'attendance record'}? This cannot be undone.`;
+      if (!window.confirm(warning)) return;
+      await api(`/admin/data/${dataResource}/${id}`, { method: 'DELETE' });
+      await adminDataManagement();
+      message('Record deleted.');
+      return;
+    }
+    if (action === 'export-selected') {
+      const selected = new Set(Array.from(document.querySelectorAll('.data-select:checked')).map((control) => Number(control.value)));
+      const records = dataRows.filter((row) => selected.has(row.id));
+      if (!records.length) throw new Error('Select at least one record from this page to export.');
+      downloadCsv(`${dataResource}-selected.csv`, records);
+      return;
+    }
+    if (action === 'export-database') {
+      await downloadFilteredDataCsv();
+      return;
+    }
     if (action === 'print-report') { window.print(); return; }
     if (action === 'mark-status') {
       document.querySelectorAll('.attendance-status').forEach((control) => { control.value = button.dataset.status; });
@@ -953,7 +1197,12 @@
       });
     });
     const pageContent = document.querySelector('.content-body');
-    if (pageContent) pageContent.style.visibility = 'hidden';
+    if (pageContent && pageName === 'admin_database') {
+      pageContent.style.visibility = 'visible';
+      pageContent.setAttribute('aria-busy', 'true');
+    } else if (pageContent) {
+      pageContent.style.visibility = 'hidden';
+    }
     loginPage();
     registrationPage();
     otpPage();

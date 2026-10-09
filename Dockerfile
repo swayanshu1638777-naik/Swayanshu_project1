@@ -18,7 +18,7 @@ COPY --chown=node:node *.html ./public/
 COPY --chown=node:node css ./public/css
 COPY --chown=node:node js ./public/js
 COPY --chown=node:node assets ./public/assets
-RUN mkdir -p /app/data && chown node:node /app/data
+RUN mkdir -p /app/data /app/backups && chown node:node /app/data /app/backups
 
 USER node
 VOLUME ["/app/data"]

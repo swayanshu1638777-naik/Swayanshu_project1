@@ -13,24 +13,30 @@ const {
 const { createDatabase } = require('../src/database');
 
 const validSeedPasswords = {
-  DEFAULT_ADMIN_PASSWORD: 'admin-password-long',
-  DEFAULT_TEACHER_PASSWORD: 'teacher-password-long',
-  DEFAULT_STUDENT_PASSWORD: 'student-password-long',
+  DEFAULT_ADMIN_PASSWORD: 'test-admin-password-long',
+  DEFAULT_TEACHER_PASSWORD: 'test-teacher-password-long',
+  DEFAULT_STUDENT_PASSWORD: 'test-student-password-long',
 };
 const validRuntimeConfig = {
   ...validSeedPasswords,
-  JWT_SECRET: '9d5c1a7f3e8b2c6a0f4d9e1b7c3a8f5d',
-  CORS_ORIGIN: 'https://portal.example.net,https://admin.example.net',
-  OTP_DELIVERY_URL: 'https://otp-provider.example.net/deliver',
+  TRUST_PROXY: '1',
+  JWT_SECRET: 'test-jwt-secret-with-enough-distinct-characters',
+  CORS_ORIGIN: 'https://portal.example.test,https://admin.example.test',
+  OTP_DELIVERY_PROVIDER: 'webhook',
+  OTP_DELIVERY_URL: 'https://otp-provider.example.test/deliver',
 };
 const validAdminConfig = {
   INITIAL_ADMIN_USERNAME: 'portal-admin',
-  INITIAL_ADMIN_EMAIL: 'portal-admin@college.edu',
+  INITIAL_ADMIN_EMAIL: 'portal-admin@college.test',
   INITIAL_ADMIN_NAME: 'College Portal Administrator',
 };
 
 test('production runtime accepts strong JWT secret and explicit trusted CORS origins', () => {
   assert.doesNotThrow(() => validateProductionRuntimeConfig(validRuntimeConfig));
+  assert.throws(() => validateProductionRuntimeConfig({
+    ...validRuntimeConfig,
+    TRUST_PROXY: 'true',
+  }), /TRUST_PROXY=1/);
 });
 
 test('production runtime rejects missing or weak JWT secrets', () => {
@@ -98,6 +104,39 @@ test('production runtime requires a non-placeholder HTTPS OTP delivery endpoint'
   }), /OTP_DELIVERY_URL/);
 });
 
+test('production runtime keeps existing webhook deployments working without a provider selector', () => {
+  const webhookConfig = { ...validRuntimeConfig };
+  delete webhookConfig.OTP_DELIVERY_PROVIDER;
+  assert.doesNotThrow(() => validateProductionRuntimeConfig(webhookConfig));
+});
+
+test('production runtime validates the Resend email adapter configuration', () => {
+  const resendConfig = {
+    ...validRuntimeConfig,
+    OTP_DELIVERY_PROVIDER: 'resend',
+    RESEND_API_KEY: 'test-resend-api-key',
+    OTP_FROM_EMAIL: 'portal@college.test',
+  };
+  delete resendConfig.OTP_DELIVERY_URL;
+  assert.doesNotThrow(() => validateProductionRuntimeConfig(resendConfig));
+  assert.throws(() => validateProductionRuntimeConfig({
+    ...resendConfig,
+    RESEND_API_KEY: '',
+  }), /RESEND_API_KEY/);
+  assert.throws(() => validateProductionRuntimeConfig({
+    ...resendConfig,
+    OTP_FROM_EMAIL: 'portal@example.com',
+  }), /OTP_FROM_EMAIL/);
+  assert.throws(() => validateProductionRuntimeConfig({
+    ...resendConfig,
+    OTP_FROM_EMAIL: 'CHANGE_ME_sender@college.edu',
+  }), /OTP_FROM_EMAIL/);
+  assert.throws(() => validateProductionRuntimeConfig({
+    ...resendConfig,
+    OTP_DELIVERY_PROVIDER: 'unknown',
+  }), /OTP_DELIVERY_PROVIDER/);
+});
+
 test('production seed requires distinct explicit passwords within bcrypt byte limits', () => {
   assert.deepEqual(getProductionSeedPasswords(validSeedPasswords), validSeedPasswords);
   assert.throws(() => getProductionSeedPasswords({
@@ -121,7 +160,7 @@ test('production seed requires distinct explicit passwords within bcrypt byte li
 test('production seed requires a valid non-demo initial admin account', () => {
   assert.deepEqual(getProductionAdminConfig(validAdminConfig), {
     username: 'portal-admin',
-    email: 'portal-admin@college.edu',
+    email: 'portal-admin@college.test',
     name: 'College Portal Administrator',
   });
   assert.throws(() => getProductionAdminConfig({
@@ -162,10 +201,12 @@ test('production seed creates only its configured administrator and no demo acco
       env: {
         ...process.env,
         NODE_ENV: 'production',
+        TRUST_PROXY: '1',
         DATABASE_PATH: databasePath,
         JWT_SECRET: validRuntimeConfig.JWT_SECRET,
-        CORS_ORIGIN: 'https://portal.university.edu',
-        OTP_DELIVERY_URL: 'https://otp.university.edu/deliver',
+        CORS_ORIGIN: 'https://portal.university.test',
+        OTP_DELIVERY_PROVIDER: 'webhook',
+        OTP_DELIVERY_URL: 'https://otp.university.test/deliver',
         ...validSeedPasswords,
         ...validAdminConfig,
       },

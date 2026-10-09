@@ -2,9 +2,12 @@ const bcrypt = require('bcryptjs');
 const crypto = require('node:crypto');
 const express = require('express');
 const { authenticate, signToken } = require('../middleware/auth');
+const { createAuthRateLimits } = require('../middleware/requestLimits');
+const { deliverOtp } = require('../services/otpDelivery');
 const { HttpError, asyncRoute, positiveId, requiredText } = require('../utils/http');
 
 const router = express.Router();
+const authRateLimits = createAuthRateLimits();
 const publicUserFields = `
   SELECT id, username, email, roll_no, full_name AS name, role, phone,
          department_id, branch_id, semester_id, section_id
@@ -49,36 +52,7 @@ function validateRegistration(body, db) {
   };
 }
 
-async function deliverOtp(payload, code) {
-  const endpoint = process.env.OTP_DELIVERY_URL;
-  if (endpoint) {
-    if (process.env.NODE_ENV === 'production' && new URL(endpoint).protocol !== 'https:') {
-      throw new HttpError(503, 'OTP_DELIVERY_URL must use HTTPS in production');
-    }
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(process.env.OTP_DELIVERY_TOKEN ? { authorization: `Bearer ${process.env.OTP_DELIVERY_TOKEN}` } : {}),
-      },
-      body: JSON.stringify({
-        email: payload.email,
-        phone: payload.phone,
-        code,
-        expiresInMinutes: Number(process.env.OTP_EXPIRY_MINUTES) || 10,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!response.ok) throw new HttpError(502, `OTP delivery failed with status ${response.status}`);
-    return;
-  }
-  if (process.env.NODE_ENV === 'production') {
-    throw new HttpError(503, 'OTP_DELIVERY_URL must be configured before registration is enabled');
-  }
-  console.info(`Development registration OTP for ${payload.email}: ${code}`);
-}
-
-router.post('/login', asyncRoute(async (req, res) => {
+router.post('/login', authRateLimits.login, asyncRoute(async (req, res) => {
   const identity = requiredText(req.body.identity || req.body.username || req.body.email, 'identity', 254);
   const password = requiredText(req.body.password, 'password', 128);
   const user = req.db.prepare(`
@@ -97,7 +71,7 @@ router.post('/login', asyncRoute(async (req, res) => {
   res.json({ token: signToken(user), user });
 }));
 
-router.post('/register', asyncRoute(async (req, res) => {
+router.post('/register', authRateLimits.register, asyncRoute(async (req, res) => {
   const payload = validateRegistration(req.body, req.db);
   const existing = req.db.prepare('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE OR username = ? OR roll_no = ?').get(
     payload.email, payload.username, payload.roll_no,
@@ -130,7 +104,7 @@ router.post('/register', asyncRoute(async (req, res) => {
   res.status(202).json({ message: 'OTP sent. Verify the code to activate your student account.', expiresInMinutes: Number(process.env.OTP_EXPIRY_MINUTES) || 10 });
 }));
 
-router.post('/verify-otp', asyncRoute(async (req, res) => {
+router.post('/verify-otp', authRateLimits.verifyOtp, asyncRoute(async (req, res) => {
   const email = requiredText(req.body.email, 'email', 254).toLowerCase();
   const code = requiredText(req.body.otp || req.body.code, 'otp', 6);
   if (!/^\d{6}$/.test(code)) throw new HttpError(400, 'otp must be a 6-digit code');

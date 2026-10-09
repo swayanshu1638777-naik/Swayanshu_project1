@@ -340,6 +340,7 @@ router.get('/catalog', (req, res) => {
     semesters: db.prepare('SELECT id, number, name FROM semesters ORDER BY number').all(),
     sections: db.prepare('SELECT id, name, branch_id, semester_id FROM sections ORDER BY name').all(),
     subjects: db.prepare('SELECT id, code, name, branch_id, semester_id FROM subjects ORDER BY code').all(),
+    teachers: db.prepare("SELECT id, full_name AS name, email FROM users WHERE role = 'Teacher' AND is_active = 1 ORDER BY full_name").all(),
   });
 });
 

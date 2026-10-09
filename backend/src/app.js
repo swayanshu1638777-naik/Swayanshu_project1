@@ -6,6 +6,7 @@ const { getDatabase } = require('./database');
 const { authenticate } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const managementRoutes = require('./routes/management');
+const dataManagementRoutes = require('./routes/dataManagement');
 const academicRoutes = require('./routes/academics');
 const dashboardRoutes = require('./routes/dashboard');
 const { HttpError } = require('./utils/http');
@@ -30,6 +31,14 @@ const openApi = {
     '/auth/me': { get: { summary: 'Get current profile', responses: { 200: { description: 'Profile' } } } },
     '/auth/change-password': { post: { summary: 'Change the current user password', responses: { 200: { description: 'Password changed' } } } },
     '/admin/catalog': { get: { summary: 'Get registration and management lookup data', responses: { 200: { description: 'Lookup data' } } } },
+    '/catalog': { get: { security: [], summary: 'Get academic lookup data for registration', responses: { 200: { description: 'Departments, branches, semesters and sections' } } } },
+    '/admin/data/counts': { get: { summary: 'Get record counts for database tables', responses: { 200: { description: 'Table counts' } } } },
+    '/admin/data/{resource}': { get: { summary: 'Search, filter, paginate, or export admin database records', responses: { 200: { description: 'Record list or CSV export' } } } },
+    '/admin/data/{resource}/{id}': {
+      get: { summary: 'View an individual database record', responses: { 200: { description: 'Record details' } } },
+      patch: { summary: 'Update supported record fields', responses: { 200: { description: 'Updated record' } } },
+      delete: { summary: 'Delete supported academic records', responses: { 204: { description: 'Deleted record' } } },
+    },
     '/admin/students': { get: { summary: 'List and filter students', responses: { 200: { description: 'Paginated student list' } } }, post: { summary: 'Create student', responses: { 201: { description: 'Created student' } } } },
     '/admin/students/{id}': { patch: { summary: 'Update student profile/class details', parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'integer' } }], responses: { 200: { description: 'Updated student' } } } },
     '/admin/teachers': { get: { summary: 'List teachers', responses: { 200: { description: 'Paginated teacher list' } } }, post: { summary: 'Create teacher', responses: { 201: { description: 'Created teacher' } } } },
@@ -59,6 +68,7 @@ const openApi = {
 function createApp(options = {}) {
   const db = options.db || getDatabase();
   const app = express();
+  app.set('trust proxy', process.env.TRUST_PROXY === '1' ? 1 : false);
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -83,7 +93,14 @@ function createApp(options = {}) {
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApi));
   app.use('/api', (req, res, next) => { req.db = db; next(); });
   app.use('/api/auth', authRoutes);
+  app.get('/api/catalog', (req, res) => res.json({
+    departments: db.prepare('SELECT id, name, code FROM departments ORDER BY name').all(),
+    branches: db.prepare('SELECT id, name, code, department_id FROM branches ORDER BY name').all(),
+    semesters: db.prepare('SELECT id, number, name FROM semesters ORDER BY number').all(),
+    sections: db.prepare('SELECT id, name, branch_id, semester_id FROM sections ORDER BY name').all(),
+  }));
   app.use('/api', authenticate(db));
+  app.use('/api/admin/data', dataManagementRoutes);
   app.use('/api/admin', managementRoutes);
   app.use('/api', academicRoutes);
   app.use('/api/dashboard', dashboardRoutes);

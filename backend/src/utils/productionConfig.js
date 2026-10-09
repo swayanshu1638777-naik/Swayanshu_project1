@@ -29,6 +29,10 @@ function isExampleHostname(hostname) {
 }
 
 function validateProductionRuntimeConfig(env) {
+  if (env.TRUST_PROXY !== '1') {
+    throw new Error('Set TRUST_PROXY=1 when running behind the single trusted Caddy proxy');
+  }
+
   const secret = env.JWT_SECRET;
   if (typeof secret !== 'string' || secret.length < 32 || new Set(secret).size < 16
       || weakJwtSecrets.has(secret) || secret.includes('CHANGE_ME')) {
@@ -55,14 +59,31 @@ function validateProductionRuntimeConfig(env) {
     }
   }
 
-  let otpDeliveryUrl;
-  try {
-    otpDeliveryUrl = new URL(env.OTP_DELIVERY_URL);
-  } catch (error) {
-    throw new Error('Set OTP_DELIVERY_URL to a trusted HTTPS delivery endpoint before starting in production');
-  }
-  if (otpDeliveryUrl.protocol !== 'https:' || isExampleHostname(otpDeliveryUrl.hostname)) {
-    throw new Error('OTP_DELIVERY_URL must be a trusted HTTPS delivery endpoint before starting in production');
+  const otpProvider = env.OTP_DELIVERY_PROVIDER || (env.OTP_DELIVERY_URL ? 'webhook' : 'resend');
+  if (otpProvider === 'resend') {
+    const fromEmail = env.OTP_FROM_EMAIL;
+    const fromDomain = typeof fromEmail === 'string' ? fromEmail.split('@').at(-1) : '';
+    if (typeof env.RESEND_API_KEY !== 'string' || !env.RESEND_API_KEY.trim()
+        || env.RESEND_API_KEY.includes('CHANGE_ME')) {
+      throw new Error('Set RESEND_API_KEY before starting OTP delivery with Resend in production');
+    }
+    if (typeof fromEmail !== 'string' || fromEmail.startsWith('CHANGE_ME')
+      || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)
+        || isExampleHostname(fromDomain)) {
+      throw new Error('Set OTP_FROM_EMAIL to a valid sender address on a verified domain');
+    }
+  } else if (otpProvider === 'webhook') {
+    let otpDeliveryUrl;
+    try {
+      otpDeliveryUrl = new URL(env.OTP_DELIVERY_URL);
+    } catch (error) {
+      throw new Error('Set OTP_DELIVERY_URL to a trusted HTTPS delivery endpoint before starting in production');
+    }
+    if (otpDeliveryUrl.protocol !== 'https:' || isExampleHostname(otpDeliveryUrl.hostname)) {
+      throw new Error('OTP_DELIVERY_URL must be a trusted HTTPS delivery endpoint before starting in production');
+    }
+  } else {
+    throw new Error('OTP_DELIVERY_PROVIDER must be either resend or webhook');
   }
   getProductionSeedPasswords(env);
 }

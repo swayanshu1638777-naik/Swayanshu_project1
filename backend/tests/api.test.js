@@ -5,13 +5,13 @@ const { createApp } = require('../src/app');
 const { createDatabase } = require('../src/database');
 
 process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-secret-that-is-long-enough-for-testing';
+process.env.JWT_SECRET = 'test-jwt-secret-long-enough-for-this-suite';
 const db = createDatabase(':memory:');
 const department = db.prepare("INSERT INTO departments(name, code) VALUES ('Computer Science', 'CSE')").run().lastInsertRowid;
 const branch = db.prepare("INSERT INTO branches(name, code, department_id) VALUES ('AI & ML', 'AIML', ?)").run(department).lastInsertRowid;
 const semester = db.prepare("INSERT INTO semesters(number, name) VALUES (3, 'Semester 3')").run().lastInsertRowid;
 const section = db.prepare("INSERT INTO sections(name, branch_id, semester_id) VALUES ('A', ?, ?)").run(branch, semester).lastInsertRowid;
-const passwordHash = bcrypt.hashSync('password123', 4);
+const passwordHash = bcrypt.hashSync('test-password-123', 4);
 const addUser = db.prepare(`
   INSERT INTO users(username, email, roll_no, full_name, role, password_hash, department_id, branch_id, semester_id, section_id)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -35,7 +35,7 @@ before(async () => {
     const response = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ identity, password: 'password123' }),
+      body: JSON.stringify({ identity, password: 'test-password-123' }),
     });
     assert.equal(response.status, 200);
     return (await response.json()).token;
@@ -73,7 +73,7 @@ test('health and login endpoints respond with expected payloads', async () => {
   const changed = await api('/auth/change-password', {
     token: studentToken,
     method: 'POST',
-    body: { current_password: 'password123', new_password: 'changed-password-123' },
+    body: { current_password: 'test-password-123', new_password: 'changed-password-123' },
   });
   assert.equal(changed.response.status, 200);
   const newLogin = await api('/auth/login', {
@@ -85,7 +85,7 @@ test('health and login endpoints respond with expected payloads', async () => {
   const restore = await api('/auth/change-password', {
     token: newLogin.result.token,
     method: 'POST',
-    body: { current_password: 'changed-password-123', new_password: 'password123' },
+    body: { current_password: 'changed-password-123', new_password: 'test-password-123' },
   });
   assert.equal(restore.response.status, 200);
 });
@@ -94,6 +94,7 @@ test('role-protected management and class assignments work', async () => {
   const catalog = await api('/admin/catalog');
   assert.equal(catalog.response.status, 200);
   assert.equal(catalog.result.branches[0].code, 'AIML');
+  assert.equal(catalog.result.teachers[0].id, teacherId);
   const denied = await api('/admin/students', { token: teacherToken });
   assert.equal(denied.response.status, 403);
   const roster = await api(`/assignments/${assignment}/roster`, { token: teacherToken });

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Management | Smart College Portal</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="admin_dashboard.html" class="sidebar-brand">
+                <div class="sidebar-brand-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+                <span>COLLEGE PORTAL</span>
+            </a>
+        </div>
+        <ul class="sidebar-menu">
+            <li class="sidebar-item"><a href="admin_dashboard.html" class="sidebar-link"><i class="fa-solid fa-chart-pie"></i> <span>Dashboard</span></a></li>
+            <li class="sidebar-item"><a href="admin_database.html" class="sidebar-link active"><i class="fa-solid fa-database"></i> <span>Data Management</span></a></li>
+            <li class="sidebar-item"><a href="admin_departments.html" class="sidebar-link"><i class="fa-solid fa-building-columns"></i> <span>Departments</span></a></li>
+            <li class="sidebar-item"><a href="admin_branches.html" class="sidebar-link"><i class="fa-solid fa-code-branch"></i> <span>Branches</span></a></li>
+            <li class="sidebar-item"><a href="admin_students.html" class="sidebar-link"><i class="fa-solid fa-user-graduate"></i> <span>Students</span></a></li>
+            <li class="sidebar-item"><a href="admin_teachers.html" class="sidebar-link"><i class="fa-solid fa-chalkboard-user"></i> <span>Teachers</span></a></li>
+            <li class="sidebar-item"><a href="admin_subjects.html" class="sidebar-link"><i class="fa-solid fa-book-open"></i> <span>Subjects</span></a></li>
+            <li class="sidebar-item"><a href="admin_reports.html" class="sidebar-link"><i class="fa-solid fa-file-contract"></i> <span>Reports</span></a></li>
+        </ul>
+    </aside>
+    <div class="main-wrapper">
+        <header class="navbar">
+            <div class="navbar-title"><i class="fa-solid fa-database" style="color: var(--primary); margin-right: 8px;"></i> Data Management</div>
+            <div class="navbar-user">
+                <span class="user-badge">ADMIN</span>
+                <span style="font-weight: 600; font-size: 0.9rem;">System Administrator</span>
+                <a href="login.html" class="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+            </div>
+        </header>
+        <main class="content-body">
+            <div class="page-header">
+                <div><h1 class="page-title">Data Management</h1><p class="page-subtitle">Loading records from the protected API…</p></div>
+            </div>
+        </main>
+    </div>
+    <script src="js/portal.js"></script>
+</body>
+</html>

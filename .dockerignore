@@ -7,6 +7,8 @@
 **/.env.*
 **/node_modules
 backend/data
+**/data/backups
+**/backups
 **/*.sqlite
 **/*.sqlite-shm
 **/*.sqlite-wal

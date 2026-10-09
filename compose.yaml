@@ -5,12 +5,28 @@ services:
       dockerfile: Dockerfile
     image: smart-college-portal:production
     restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "127.0.0.1:${PUBLISH_PORT:-5000}:5000"
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      DATABASE_PATH: /app/data/college_portal.sqlite
+      DATABASE_BACKUP_DIR: /app/backups
+      TRUST_PROXY: ${TRUST_PROXY:?Set TRUST_PROXY=1 for the single Caddy proxy}
+      JWT_SECRET: ${JWT_SECRET:?Set a unique production JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set trusted HTTPS CORS_ORIGIN values}
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:?Set a production administrator username}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:?Set a production administrator email}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:?Set a production administrator name}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?Set a unique production admin seed password}
+      DEFAULT_TEACHER_PASSWORD: ${DEFAULT_TEACHER_PASSWORD:?Set a unique production teacher seed password}
+      DEFAULT_STUDENT_PASSWORD: ${DEFAULT_STUDENT_PASSWORD:?Set a unique production student seed password}
+      OTP_DELIVERY_PROVIDER: resend
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-10}
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set the production Resend API key}
+      OTP_FROM_EMAIL: ${OTP_FROM_EMAIL:?Set the sender address on a verified domain}
     volumes:
       - portal-data:/app/data
+      - portal-backups:/app/backups
     healthcheck:
       test:
         - CMD
@@ -21,6 +37,51 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+  backup-service:
+    image: smart-college-portal:production
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "src/database/backupService.js"]
+    restart: unless-stopped
+    depends_on:
+      portal:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /app/data/college_portal.sqlite
+      DATABASE_BACKUP_DIR: /app/backups
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      S3_ENDPOINT: ${S3_ENDPOINT:?Set an HTTPS-compatible S3 endpoint}
+      S3_REGION: ${S3_REGION:?Set the S3-compatible storage region}
+      S3_BUCKET: ${S3_BUCKET:?Set the backup bucket name}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set restricted backup access key ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set restricted backup secret key}
+      S3_PREFIX: ${S3_PREFIX:-college-portal}
+    volumes:
+      - portal-data:/app/data
+      - portal-backups:/app/backups
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      portal:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:?Set the public DNS hostname in DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   portal-data:
+  portal-backups:
+  caddy-data:
+  caddy-config:
