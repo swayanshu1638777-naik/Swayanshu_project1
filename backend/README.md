@@ -61,6 +61,12 @@ Student signup uses `POST /api/auth/register` followed by
 requires a six-digit code. `GET /api/catalog` is public and returns the academic
 department, branch, semester, and section lookup lists used by registration;
 it does not expose user records. In development, the code is written to the backend console.
+Public signup creates student accounts only. Administrators create teacher
+accounts from the authenticated Admin → Teachers page (`POST /api/admin/teachers`);
+there is no public teacher or administrator signup. The initial production
+administrator is provisioned during setup with `INITIAL_ADMIN_USERNAME`,
+`INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_NAME`, and `DEFAULT_ADMIN_PASSWORD`, then
+created by running `npm run seed` as described in the deployment guide.
 Production Compose supports Resend using `OTP_DELIVERY_PROVIDER=resend`,
 `RESEND_API_KEY`, and `OTP_FROM_EMAIL` on a verified sending domain, or Brevo
 SMTP using `OTP_DELIVERY_PROVIDER=brevo-smtp`, `BREVO_SMTP_USER`,
