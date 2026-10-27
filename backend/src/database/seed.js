@@ -15,10 +15,64 @@ const productionPasswords = process.env.NODE_ENV === 'production'
   })()
   : null;
 const productionAdmin = productionPasswords ? getProductionAdminConfig(process.env) : null;
+const developmentPasswords = productionPasswords || {
+  DEFAULT_ADMIN_PASSWORD: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123',
+  DEFAULT_TEACHER_PASSWORD: process.env.DEFAULT_TEACHER_PASSWORD || 'teacher123',
+  DEFAULT_STUDENT_PASSWORD: process.env.DEFAULT_STUDENT_PASSWORD || 'student123',
+};
+
+function seedAcademicCatalog(db) {
+  const departmentRows = [
+    ['Computer Science & Engineering', 'CSE_DEPT'],
+    ['Electronics & Communication', 'ECE_DEPT'],
+    ['Mechanical Engineering', 'ME_DEPT'],
+    ['Civil Engineering', 'CE_DEPT'],
+  ];
+  const addDepartment = db.prepare('INSERT OR IGNORE INTO departments(name, code) VALUES (?, ?)');
+  for (const department of departmentRows) addDepartment.run(...department);
+
+  const departments = Object.fromEntries(db.prepare('SELECT id, code FROM departments').all().map((row) => [row.code, row.id]));
+  const branches = [
+    ['Computer Science', 'CSE', departments.CSE_DEPT],
+    ['CSE Artificial Intelligence', 'CSE-AI', departments.CSE_DEPT],
+    ['AI & Machine Learning', 'AIML', departments.CSE_DEPT],
+    ['Electronics & Communication', 'ECE', departments.ECE_DEPT],
+    ['Mechanical Engineering', 'ME', departments.ME_DEPT],
+    ['Civil Engineering', 'CE', departments.CE_DEPT],
+  ];
+  const addBranch = db.prepare('INSERT OR IGNORE INTO branches(name, code, department_id) VALUES (?, ?, ?)');
+  for (const branch of branches) addBranch.run(...branch);
+  const branchIds = Object.fromEntries(db.prepare('SELECT id, code FROM branches').all().map((row) => [row.code, row.id]));
+
+  const addSemester = db.prepare('INSERT OR IGNORE INTO semesters(number, name) VALUES (?, ?)');
+  for (let number = 1; number <= 8; number += 1) addSemester.run(number, `Semester ${number}`);
+  const semesterIds = Object.fromEntries(db.prepare('SELECT id, number FROM semesters').all().map((row) => [row.number, row.id]));
+  const addSection = db.prepare('INSERT OR IGNORE INTO sections(name, branch_id, semester_id) VALUES (?, ?, ?)');
+  const sectionSeed = [
+    ['A', 'AIML', 3], ['B', 'AIML', 3], ['A', 'CSE', 1], ['A', 'CSE-AI', 3],
+    ['A', 'ECE', 3], ['A', 'ME', 3], ['A', 'CE', 3],
+  ];
+  for (const [name, branchCode, semesterNumber] of sectionSeed) {
+    addSection.run(name, branchIds[branchCode], semesterIds[semesterNumber]);
+  }
+  for (const branchCode of Object.keys(branchIds)) {
+    for (let semesterNumber = 1; semesterNumber <= 8; semesterNumber += 1) {
+      addSection.run('A', branchIds[branchCode], semesterIds[semesterNumber]);
+    }
+  }
+}
+
+for (const [key, password] of Object.entries(developmentPasswords)) {
+  if (password.length < 8 || password.length > 128 || !password.trim()
+      || Buffer.byteLength(password, 'utf8') > 72) {
+    throw new Error(`${key} must be non-blank, at least 8 characters, and no more than 72 UTF-8 bytes`);
+  }
+}
 const db = getDatabase();
 const seed = db.transaction(() => {
   if (productionAdmin) {
     assertNoDemoSeedAccounts(db);
+    seedAcademicCatalog(db);
     let department = db.prepare("SELECT id FROM departments WHERE code = 'PORTAL_ADMIN'").get();
     if (!department) {
       const result = db.prepare('INSERT INTO departments(name, code) VALUES (?, ?)').run('Administration', 'PORTAL_ADMIN');
@@ -80,9 +134,9 @@ const seed = db.transaction(() => {
   const addSubject = db.prepare('INSERT OR IGNORE INTO subjects(code, name, branch_id, semester_id) VALUES (?, ?, ?, ?)');
   addSubject.run('CS301', 'Data Structures & Algorithms', branchIds.AIML, semesterIds[3]);
   addSubject.run('CS302', 'Database Management System', branchIds.AIML, semesterIds[3]);
-  const adminHash = bcrypt.hashSync(productionPasswords?.DEFAULT_ADMIN_PASSWORD || process.env.DEFAULT_ADMIN_PASSWORD || 'admin123', 12);
-  const teacherHash = bcrypt.hashSync(productionPasswords?.DEFAULT_TEACHER_PASSWORD || process.env.DEFAULT_TEACHER_PASSWORD || 'teacher123', 12);
-  const studentHash = bcrypt.hashSync(productionPasswords?.DEFAULT_STUDENT_PASSWORD || process.env.DEFAULT_STUDENT_PASSWORD || 'student123', 12);
+  const adminHash = bcrypt.hashSync(developmentPasswords.DEFAULT_ADMIN_PASSWORD, 12);
+  const teacherHash = bcrypt.hashSync(developmentPasswords.DEFAULT_TEACHER_PASSWORD, 12);
+  const studentHash = bcrypt.hashSync(developmentPasswords.DEFAULT_STUDENT_PASSWORD, 12);
   const addUser = db.prepare(`
     INSERT OR IGNORE INTO users(username, email, roll_no, full_name, role, password_hash, phone,
                                 department_id, branch_id, semester_id, section_id)
@@ -113,7 +167,11 @@ const seed = db.transaction(() => {
   for (const [index, assignment] of assignmentIds.entries()) {
     addAssessment.run(assignment.id, 'Midterm Examination', 100, '2026-08-08');
     addAssessment.run(assignment.id, 'Class Test 1', 20, '2026-08-15');
-    const exams = db.prepare('SELECT id, title FROM assessments WHERE assignment_id = ?').all(assignment.id);
+    const exams = db.prepare(`
+      SELECT id, title FROM assessments
+      WHERE assignment_id = ?
+      ORDER BY assessment_date, id
+    `).all(assignment.id);
     const marks = assignment.subject_id === subjectIds.CS301
       ? { '101': [82, 16], '102': [46, 9], '103': [68, 14] }
       : { '101': [78, 15], '102': [48, 10], '103': [67, 13] };

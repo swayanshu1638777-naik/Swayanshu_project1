@@ -1,6 +1,6 @@
 const express = require('express');
 const { allowRoles } = require('../middleware/auth');
-const { HttpError, asyncRoute, positiveId, requiredText } = require('../utils/http');
+const { HttpError, asyncRoute, isValidDate, positiveId, requiredText } = require('../utils/http');
 
 const router = express.Router();
 const attendanceStatuses = new Set(['Present', 'Absent', 'Late', 'Excused']);
@@ -76,7 +76,7 @@ router.get('/attendance', (req, res) => {
     filters.push('a.assignment_id = ?'); params.push(positiveId(req.query.assignment_id, 'assignment_id'));
   }
   if (req.query.date) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date))) throw new HttpError(400, 'date must use YYYY-MM-DD');
+    if (!isValidDate(String(req.query.date))) throw new HttpError(400, 'date must be a valid YYYY-MM-DD date');
     filters.push('a.attendance_date = ?'); params.push(req.query.date);
   }
   const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
@@ -96,7 +96,7 @@ router.get('/attendance', (req, res) => {
 router.post('/attendance/bulk', allowRoles('Admin', 'Teacher'), (req, res) => {
   const assignmentId = positiveId(req.body.assignment_id, 'assignment_id');
   const date = requiredText(req.body.date, 'date', 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+  if (!isValidDate(date)) {
     throw new HttpError(400, 'date must be a valid YYYY-MM-DD date');
   }
   const records = req.body.records;
@@ -107,6 +107,9 @@ router.post('/attendance/bulk', allowRoles('Admin', 'Teacher'), (req, res) => {
   canAccessAssignment(req, assignment);
   const seen = new Set();
   for (const record of records) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new HttpError(400, 'Each attendance entry must be a JSON object');
+    }
     const studentId = positiveId(record.student_id, 'student_id');
     if (seen.has(studentId)) throw new HttpError(400, `student_id ${studentId} occurs more than once`);
     seen.add(studentId);
@@ -137,7 +140,7 @@ router.post('/assessments', allowRoles('Admin', 'Teacher'), (req, res) => {
   const maxMarks = Number(req.body.max_marks);
   const assessmentDate = requiredText(req.body.assessment_date, 'assessment_date', 10);
   if (!Number.isFinite(maxMarks) || maxMarks <= 0 || maxMarks > 10000) throw new HttpError(400, 'max_marks must be between 0 and 10000');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(assessmentDate) || Number.isNaN(Date.parse(`${assessmentDate}T00:00:00Z`))) {
+  if (!isValidDate(assessmentDate)) {
     throw new HttpError(400, 'assessment_date must be a valid YYYY-MM-DD date');
   }
   const result = req.db.prepare(`
@@ -178,6 +181,9 @@ router.post('/assessments/:id/marks', allowRoles('Admin', 'Teacher'), (req, res)
   }
   const seen = new Set();
   for (const record of records) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new HttpError(400, 'Each mark entry must be a JSON object');
+    }
     const studentId = positiveId(record.student_id, 'student_id');
     const score = Number(record.score);
     if (seen.has(studentId)) throw new HttpError(400, `student_id ${studentId} occurs more than once`);
@@ -239,8 +245,12 @@ router.get('/profile', allowRoles('Student'), (req, res) => {
 
 router.patch('/profile', allowRoles('Student'), (req, res) => {
   const name = req.body.name == null ? req.user.name : requiredText(req.body.name, 'name');
-  const phone = req.body.phone == null ? req.user.phone : requiredText(req.body.phone, 'phone', 20);
-  if (phone && !/^\d{10}$/.test(phone)) throw new HttpError(400, 'phone must contain exactly 10 digits');
+  const phone = req.body.phone === undefined
+    ? req.user.phone
+    : req.body.phone == null || req.body.phone === ''
+      ? null
+      : requiredText(req.body.phone, 'phone', 20);
+  if (phone !== null && !/^\d{10}$/.test(phone)) throw new HttpError(400, 'phone must contain exactly 10 digits');
   req.db.prepare('UPDATE users SET full_name = ?, phone = ? WHERE id = ?').run(name, phone, req.user.id);
   res.json({ user: req.db.prepare('SELECT id, username, email, roll_no, full_name AS name, phone FROM users WHERE id = ?').get(req.user.id) });
 });

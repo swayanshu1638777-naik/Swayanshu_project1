@@ -4,7 +4,15 @@ const express = require('express');
 const { authenticate, signToken } = require('../middleware/auth');
 const { createAuthRateLimits } = require('../middleware/requestLimits');
 const { deliverOtp } = require('../services/otpDelivery');
-const { HttpError, asyncRoute, positiveId, requiredText } = require('../utils/http');
+const { getOtpExpiryMinutes } = require('../utils/productionConfig');
+const {
+  HttpError,
+  asyncRoute,
+  positiveId,
+  requiredLoginPassword,
+  requiredPassword,
+  requiredText,
+} = require('../utils/http');
 
 const router = express.Router();
 const authRateLimits = createAuthRateLimits();
@@ -19,8 +27,8 @@ function validateRegistration(body, db) {
   const rollNo = requiredText(body.roll_no, 'roll_no', 40);
   const email = requiredText(body.email, 'email', 254).toLowerCase();
   const phone = requiredText(body.phone, 'phone', 20);
-  const password = requiredText(body.password, 'password', 128);
-  if (!/^[^\s@]+@ssipmt\.com$/i.test(email)) throw new HttpError(400, 'Registration requires an @ssipmt.com email');
+  const password = requiredPassword(body.password);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'email must be valid');
   if (!/^\d{10}$/.test(phone)) throw new HttpError(400, 'phone must contain exactly 10 digits');
   if (password.length < 8) throw new HttpError(400, 'password must contain at least 8 characters');
 
@@ -54,7 +62,7 @@ function validateRegistration(body, db) {
 
 router.post('/login', authRateLimits.login, asyncRoute(async (req, res) => {
   const identity = requiredText(req.body.identity || req.body.username || req.body.email, 'identity', 254);
-  const password = requiredText(req.body.password, 'password', 128);
+  const password = requiredLoginPassword(req.body.password);
   const user = req.db.prepare(`
     ${publicUserFields}, password_hash, is_active
     FROM users
@@ -79,11 +87,12 @@ router.post('/register', authRateLimits.register, asyncRoute(async (req, res) =>
   if (existing) throw new HttpError(409, 'An account with this email or roll number already exists');
 
   const now = Date.now();
+  const expiresInMinutes = getOtpExpiryMinutes();
   const previous = req.db.prepare('SELECT last_sent_at FROM registration_otps WHERE email = ? COLLATE NOCASE').get(payload.email);
   if (previous && now - previous.last_sent_at < 60000) throw new HttpError(429, 'Wait one minute before requesting another OTP');
 
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-  const expiresAt = now + (Number(process.env.OTP_EXPIRY_MINUTES) || 10) * 60000;
+  const expiresAt = now + expiresInMinutes * 60000;
   payload.password_hash = await bcrypt.hash(payload.password, 12);
   delete payload.password;
   const otpHash = await bcrypt.hash(code, 10);
@@ -101,7 +110,7 @@ router.post('/register', authRateLimits.register, asyncRoute(async (req, res) =>
     req.db.prepare('DELETE FROM registration_otps WHERE email = ? COLLATE NOCASE').run(payload.email);
     throw error;
   }
-  res.status(202).json({ message: 'OTP sent. Verify the code to activate your student account.', expiresInMinutes: Number(process.env.OTP_EXPIRY_MINUTES) || 10 });
+  res.status(202).json({ message: 'OTP sent. Verify the code to activate your student account.', expiresInMinutes });
 }));
 
 router.post('/verify-otp', authRateLimits.verifyOtp, asyncRoute(async (req, res) => {
@@ -142,8 +151,8 @@ router.post('/verify-otp', authRateLimits.verifyOtp, asyncRoute(async (req, res)
 router.post('/change-password',
   (req, res, next) => authenticate(req.db)(req, res, next),
   asyncRoute(async (req, res) => {
-    const currentPassword = requiredText(req.body.current_password, 'current_password', 128);
-    const newPassword = requiredText(req.body.new_password, 'new_password', 128);
+    const currentPassword = requiredPassword(req.body.current_password, 'current_password');
+    const newPassword = requiredPassword(req.body.new_password, 'new_password');
     if (newPassword.length < 8) throw new HttpError(400, 'new_password must contain at least 8 characters');
     const user = req.db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
     if (!(await bcrypt.compare(currentPassword, user.password_hash))) throw new HttpError(401, 'Current password is incorrect');

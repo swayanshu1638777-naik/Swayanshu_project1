@@ -1,15 +1,16 @@
 # Smart College Portal API
 
 The backend is an Express REST API backed by SQLite. In development it serves
-APIs and Swagger documentation; the static pages are served separately. The
-production container serves the frontend and APIs from one origin.
+APIs and Swagger documentation; run `npm run frontend` in a second terminal to
+serve the portal pages separately. The production container serves the
+frontend and APIs from one origin.
 
 ## Run locally
 
 Use Node.js 22 or newer.
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 npm install
 npm run seed
 npm run dev
@@ -19,13 +20,22 @@ The API listens on port `5000` by default. Swagger UI is at
 `http://localhost:5000/api/docs`; OpenAPI JSON is at
 `http://localhost:5000/api/openapi.json`. The SQLite file is created at
 `data/college_portal.sqlite` by default. Set `DATABASE_PATH` to change it.
+In a second terminal from `backend/`, run `npm run frontend` and open
+`http://127.0.0.1:5501`. The frontend server is loopback-only and serves portal
+HTML, CSS, JavaScript, and local assets, not backend files or database data.
+
+`npm run seed` is optional for an existing college database. It is insert-only:
+it adds missing development/demo data and never overwrites or deletes existing
+accounts or records. Do not delete the SQLite file or its `-wal`/`-shm`
+sidecars to troubleshoot the database.
 
 For a production container build, see the repository-root `Dockerfile` and
 `compose.yaml`; use the root `deploy/production.env.example` as a starting
 point for the untracked deployment `.env` file.
 
 Seed users (passwords can be overridden with the corresponding `DEFAULT_*`
-variables before running `npm run seed`):
+variables before running `npm run seed`; seed passwords must be at least 8
+characters and no more than 72 UTF-8 bytes):
 
 | Role | Login | Default password |
 | --- | --- | --- |
@@ -47,16 +57,30 @@ assignment boundaries. Authenticated users can change their password through
 `new_password`.
 
 Student signup uses `POST /api/auth/register` followed by
-`POST /api/auth/verify-otp`. Registration requires an `@ssipmt.com` email and
-a six-digit code. In development, the code is written to the backend console.
-Production Compose sends email through Resend using `OTP_DELIVERY_PROVIDER=resend`,
-`RESEND_API_KEY`, and `OTP_FROM_EMAIL` on a verified sending domain. The existing
-custom HTTPS webhook remains available with `OTP_DELIVERY_PROVIDER=webhook`,
-`OTP_DELIVERY_URL`, and optional `OTP_DELIVERY_TOKEN`. OTP values are stored
+`POST /api/auth/verify-otp`. Registration accepts any valid email address and
+requires a six-digit code. `GET /api/catalog` is public and returns the academic
+department, branch, semester, and section lookup lists used by registration;
+it does not expose user records. In development, the code is written to the backend console.
+Production Compose supports Resend using `OTP_DELIVERY_PROVIDER=resend`,
+`RESEND_API_KEY`, and `OTP_FROM_EMAIL` on a verified sending domain, or Brevo
+SMTP using `OTP_DELIVERY_PROVIDER=brevo-smtp`, `BREVO_SMTP_USER`,
+`BREVO_SMTP_KEY`, and `OTP_FROM_EMAIL` configured for a verified sender. The
+existing custom HTTPS webhook remains available with
+`OTP_DELIVERY_PROVIDER=webhook`, `OTP_DELIVERY_URL`, and optional
+`OTP_DELIVERY_TOKEN`. OTP values are stored
 hashed, expire, and are limited to five attempts. Login, registration, and OTP
 verification requests are additionally rate-limited by client IP. When running
 behind the Compose Caddy service set `TRUST_PROXY=1`; only do this when exactly
 one trusted proxy is in front of Express.
+Set `OTP_EXPIRY_MINUTES` to an integer from 1 to 60; it defaults to 10. In
+development, leaving the provider unset logs codes to the
+backend console; configuring a provider sends real email.
+
+Administrators must provide a password when creating a student or teacher;
+the API does not assign shared fallback credentials. New password input is used
+verbatim, including leading or trailing spaces, requires at least 8 characters,
+and is limited to 72 UTF-8 bytes to avoid bcrypt truncation. Login continues to
+verify legacy accounts created before that byte limit was enforced.
 
 ## API areas
 
@@ -123,3 +147,9 @@ an S3-compatible client, stop both `portal` and `backup-service`, verify
 restart. The project README documents the full Compose restore command. Store
 off-host copies and periodically rehearse restoring to a test volume. Never
 serve or expose the SQLite file itself.
+
+For local recovery, first stop the backend cleanly and make a separate copy of
+the database directory. Prefer `npm run backup` while the backend is running
+for a consistent backup. Do not manually remove or replace the database or
+WAL/SHM files while SQLite may be using them; follow the documented restore
+procedure only after verifying a backup and stopping all database clients.

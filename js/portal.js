@@ -96,18 +96,96 @@
   const input = (label, name, type, required, placeholder, value) => `
     <div class="form-group"><label class="form-label" for="${esc(name)}">${esc(label)}</label>
     <input class="form-control" id="${esc(name)}" name="${esc(name)}" type="${esc(type || 'text')}"
-      ${required ? 'required' : ''} placeholder="${esc(placeholder || '')}" value="${esc(value || '')}"></div>`;
+      ${required ? 'required' : ''} ${type === 'password' ? 'maxlength="128"' : ''}
+      placeholder="${esc(placeholder || '')}" value="${esc(value || '')}"></div>`;
   const submitButton = (text) => `<button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> ${esc(text)}</button>`;
   const table = (headers, rows) => `<div class="table-responsive"><table class="table">
     <thead><tr>${headers.map((heading) => `<th>${esc(heading)}</th>`).join('')}</tr></thead>
     <tbody>${rows || '<tr><td colspan="20">No records found.</td></tr>'}</tbody></table></div>`;
   const actionButton = (action, id, label, kind) => `<button type="button" class="btn ${kind || 'btn-secondary'}"
     data-action="${esc(action)}" data-id="${esc(id)}">${esc(label)}</button>`;
+  const accountActionButton = (action, row, label) => `<button type="button" class="btn btn-secondary"
+    data-action="${esc(action)}" data-id="${esc(row.id)}" data-resource="${esc(pageName === 'admin_students' ? 'students' : 'teachers')}"
+    data-name="${esc(row.name)}" data-phone="${esc(row.phone || '')}">${esc(label)}</button>`;
+  function closeAccountDialog(dialog) {
+    if (!dialog) return;
+    if (dialog.open) dialog.close();
+    dialog.remove();
+  }
+  function openAccountDialog(button, action) {
+    document.querySelectorAll('.portal-account-dialog').forEach(closeAccountDialog);
+    const isReset = action === 'reset-password';
+    const dialog = document.createElement('dialog');
+    dialog.className = 'portal-account-dialog';
+    const id = button.dataset.id;
+    const resource = button.dataset.resource;
+    if (isReset) {
+      dialog.innerHTML = `<form data-action="reset-user-password" class="form-grid">
+        <h2 id="account-dialog-title">Reset account password</h2>
+        <p>Choose a temporary password with at least 8 characters.</p>
+        <input type="hidden" name="id" value="${esc(id)}">
+        <label class="form-group"><span class="form-label">Temporary password</span>
+          <input class="form-control" name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+        <label class="form-group"><span class="form-label">Confirm temporary password</span>
+          <input class="form-control" name="confirm_password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+        <p class="portal-dialog-message" data-dialog-message role="status" aria-live="polite"></p>
+        <div class="portal-dialog-actions"><button class="btn btn-secondary" type="button" data-action="close-account-dialog">Cancel</button>
+          <button class="btn btn-primary" type="submit">Reset password</button></div></form>`;
+    } else {
+      dialog.innerHTML = `<form data-action="update-user-account" class="form-grid">
+        <h2 id="account-dialog-title">Edit ${resource === 'students' ? 'student' : 'teacher'} account</h2>
+        <input type="hidden" name="id" value="${esc(id)}">
+        <input type="hidden" name="resource" value="${esc(resource)}">
+        <label class="form-group"><span class="form-label">Full name</span>
+          <input class="form-control" name="name" type="text" maxlength="160" value="${esc(button.dataset.name)}" autocomplete="name" required></label>
+        <label class="form-group"><span class="form-label">Phone number</span>
+          <input class="form-control" name="phone" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10"
+            placeholder="10 digits, or leave blank to clear" value="${esc(button.dataset.phone)}" autocomplete="tel"></label>
+        <p class="portal-dialog-message" data-dialog-message role="status" aria-live="polite"></p>
+        <div class="portal-dialog-actions"><button class="btn btn-secondary" type="button" data-action="close-account-dialog">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save changes</button></div></form>`;
+    }
+    dialog.setAttribute('aria-labelledby', 'account-dialog-title');
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+    document.body.append(dialog);
+    dialog.showModal();
+    dialog.querySelector('input:not([type="hidden"])').focus();
+  }
+  function openReferenceDialog(resource, row) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'portal-account-dialog portal-reference-dialog';
+    const referenceOptions = (items, selectedId, label) => items.map((item) =>
+      `<option value="${esc(item.id)}" ${String(item.id) === String(selectedId) ? 'selected' : ''}>${esc(label(item))}</option>`).join('');
+    const fields = {
+      departments: `${input('Department name', 'name', 'text', true, '', row.name)}${input('Department code', 'code', 'text', true, '', row.code)}`,
+      branches: `${select('Department', 'department_id', referenceOptions(catalog.departments, row.department_id, (item) => `${item.name} (${item.code})`), true)}${input('Branch name', 'name', 'text', true, '', row.name)}${input('Branch code', 'code', 'text', true, '', row.code)}`,
+      semesters: `${input('Semester number', 'number', 'number', true, '', row.number)}${input('Semester name', 'name', 'text', true, '', row.name)}`,
+      sections: `${input('Section name', 'name', 'text', true, '', row.name)}${select('Branch', 'branch_id', referenceOptions(catalog.branches, row.branch_id, (item) => `${item.name} (${item.code})`), true)}${select('Semester', 'semester_id', referenceOptions(catalog.semesters, row.semester_id, (item) => item.name), true)}`,
+      subjects: `${input('Subject code', 'code', 'text', true, '', row.code)}${input('Subject name', 'name', 'text', true, '', row.name)}${select('Branch', 'branch_id', referenceOptions(catalog.branches, row.branch_id, (item) => `${item.name} (${item.code})`), true)}${select('Semester', 'semester_id', referenceOptions(catalog.semesters, row.semester_id, (item) => item.name), true)}`,
+    }[resource];
+    if (!fields) throw new Error('This reference-data type cannot be edited.');
+    dialog.innerHTML = `<form data-action="update-reference" class="form-grid">
+      <h2 id="reference-dialog-title">Edit ${esc(resource.slice(0, -1))}</h2>
+      <input type="hidden" name="id" value="${esc(row.id)}">
+      <input type="hidden" name="resource" value="${esc(resource)}">
+      ${fields}
+      <p class="portal-dialog-message" data-dialog-message role="status" aria-live="polite"></p>
+      <div class="portal-dialog-actions"><button class="btn btn-secondary" type="button" data-action="close-account-dialog">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save changes</button></div></form>`;
+    dialog.setAttribute('aria-labelledby', 'reference-dialog-title');
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+    document.body.append(dialog);
+    dialog.showModal();
+    dialog.querySelector('input:not([type="hidden"]), select').focus();
+  }
   const stat = (label, value, icon) => `<div class="stat-card"><div class="stat-card-top">
     <span class="stat-title">${esc(label)}</span><div class="stat-icon blue"><i class="fa-solid ${esc(icon || 'fa-chart-simple')}"></i></div>
     </div><div class="stat-value">${esc(value == null ? '—' : value)}</div></div>`;
   const asPercent = (value) => value == null ? '—' : `${Number(value).toFixed(2)}%`;
-  const dateToday = () => new Date().toISOString().slice(0, 10);
+  const dateToday = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
   const assignmentLabel = (item) => `${item.subject} (${item.subject_code}) · ${item.branch} · ${item.semester} · ${item.section}${item.teacher ? ` · ${item.teacher}` : ''}`;
   const assignmentOptions = (items, selected) => (items || []).map((item) =>
     `<option value="${esc(item.id)}" ${String(item.id) === String(selected) ? 'selected' : ''}>${esc(assignmentLabel(item))}</option>`).join('');
@@ -213,10 +291,6 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = Object.fromEntries(new FormData(form).entries());
-      if (!values.email.toLowerCase().endsWith('@ssipmt.com')) {
-        messageNode.textContent = 'Registration requires your @ssipmt.com email address.';
-        return;
-      }
       if (values.password !== values.confirm_password) {
         messageNode.textContent = 'Passwords do not match.';
         return;
@@ -227,7 +301,7 @@
       try {
         const result = await api('/auth/register', { method: 'POST', body: values });
         sessionStorage.setItem('collegePortalPendingEmail', values.email);
-        messageNode.textContent = result.message || 'OTP sent. Check the email/phone delivery configured by your college.';
+        messageNode.textContent = result.message || 'OTP sent. Check the email configured by your college.';
         location.href = 'verify_otp.html';
       } catch (error) {
         messageNode.textContent = error.message;
@@ -366,32 +440,55 @@
       <div class="portal-two-column"><section class="card"><div class="card-header"><h3 class="card-title">Add Student</h3></div>
         <form data-action="create-student">${input('Roll Number', 'roll_no', 'text', true)}
           ${input('Full Name', 'name', 'text', true)}${input('Email', 'email', 'email', true)}
-          ${input('Phone', 'phone', 'tel', false)}${input('Password', 'password', 'password', false, 'Minimum 8 characters')}
-          ${select('Department', 'department_id', escOptions(cat.departments, 'id', (x) => `${x.name} (${x.code})`), true)}
-          ${select('Branch', 'branch_id', escOptions(cat.branches, 'id', (x) => `${x.name} (${x.code})`), true)}
-          ${select('Semester', 'semester_id', escOptions(cat.semesters, 'id', (x) => x.name), true)}
+          ${input('Phone', 'phone', 'tel', false)}${input('Password', 'password', 'password', true, 'Minimum 8 characters')}
+          ${select('Department', 'department_id', escOptions(cat.departments, 'id', (x) => `${x.name} (${x.code})`, 'Select department'), true)}
+          ${select('Branch', 'branch_id', escOptions([], 'id', (x) => `${x.name} (${x.code})`, 'Select branch'), true)}
+          ${select('Semester', 'semester_id', escOptions(cat.semesters, 'id', (x) => x.name, 'Select semester'), true)}
           ${select('Section', 'section_id', escOptions(cat.sections, 'id', (x) => {
             const branch = cat.branches.find((b) => b.id === x.branch_id);
             const semester = cat.semesters.find((s) => s.id === x.semester_id);
             return `${branch ? branch.code : ''} ${semester ? semester.name : ''} Section ${x.name}`;
-          }), true)}${submitButton('Save Student')}</form></section>
+          }, 'Select section'), true)}${submitButton('Save Student')}</form></section>
       <section class="card"><div class="card-header"><h3 class="card-title">Students (${esc(result.total)})</h3></div>
         ${table(['Roll No', 'Student', 'Email', 'Branch', 'Semester', 'Section', 'Status', 'Actions'],
           result.data.map((row) => `<tr><td>${esc(row.roll_no)}</td><td>${esc(row.name)}</td><td>${esc(row.email)}</td>
             <td>${esc(row.branch)}</td><td>${esc(row.semester)}</td><td>${esc(row.section)}</td>
-            <td>${row.is_active ? 'Active' : 'Inactive'}</td><td>${actionButton('edit-user', row.id, 'Edit')}
+            <td>${row.is_active ? 'Active' : 'Inactive'}</td><td>${accountActionButton('edit-user', row, 'Edit')}
             ${actionButton('toggle-user', row.id, row.is_active ? 'Deactivate' : 'Activate', row.is_active ? 'btn-danger' : 'btn-secondary')}
-            ${actionButton('reset-password', row.id, 'Reset password')}</td></tr>`).join(''))}</section></div>`);
+            ${accountActionButton('reset-password', row, 'Reset password')}</td></tr>`).join(''))}</section></div>`);
     const form = document.querySelector('[data-action="filter-students"]');
     if (form) {
       form.elements.q.value = new URLSearchParams(location.search).get('q') || '';
       form.elements.branch_id.value = new URLSearchParams(location.search).get('branch_id') || '';
       form.elements.semester_id.value = new URLSearchParams(location.search).get('semester_id') || '';
     }
+    const createForm = document.querySelector('[data-action="create-student"]');
+    const departmentControl = createForm.elements.department_id;
+    const branchControl = createForm.elements.branch_id;
+    const semesterControl = createForm.elements.semester_id;
+    const sectionControl = createForm.elements.section_id;
+    const fillBranches = () => {
+      const branches = cat.branches.filter((branch) => String(branch.department_id) === departmentControl.value);
+      const selected = branches.some((branch) => String(branch.id) === branchControl.value) ? branchControl.value : '';
+      branchControl.innerHTML = escOptions(branches, 'id', (branch) => `${branch.name} (${branch.code})`, 'Select branch');
+      branchControl.value = selected;
+      fillSections();
+    };
+    const fillSections = () => {
+      const sections = cat.sections.filter((section) =>
+        String(section.branch_id) === branchControl.value && String(section.semester_id) === semesterControl.value);
+      const selected = sections.some((section) => String(section.id) === sectionControl.value) ? sectionControl.value : '';
+      sectionControl.innerHTML = escOptions(sections, 'id', (section) => `Section ${section.name}`, 'Select section');
+      sectionControl.value = selected;
+    };
+    departmentControl.addEventListener('change', fillBranches);
+    branchControl.addEventListener('change', fillSections);
+    semesterControl.addEventListener('change', fillSections);
+    fillBranches();
   }
 
   async function adminTeachers() {
-    const [cat, result, assignmentResult, teachersResult] = await Promise.all([
+    const [cat, result, assignmentResult] = await Promise.all([
       loadCatalog(), api('/admin/teachers'), api('/admin/assignments'),
     ]);
     const teachers = result.data || [];
@@ -399,27 +496,44 @@
       <div class="portal-two-column"><section class="card"><div class="card-header"><h3 class="card-title">Add Faculty</h3></div>
         <form data-action="create-teacher">${input('Username', 'username', 'text', true)}
           ${input('Full Name', 'name', 'text', true)}${input('Email', 'email', 'email', true)}
-          ${input('Phone', 'phone', 'tel', false)}${input('Password', 'password', 'password', false, 'Minimum 8 characters')}
+          ${input('Phone', 'phone', 'tel', false)}${input('Password', 'password', 'password', true, 'Minimum 8 characters')}
           ${select('Department', 'department_id', escOptions(cat.departments, 'id', (x) => `${x.name} (${x.code})`), true)}${submitButton('Save Faculty')}</form></section>
       <section class="card"><div class="card-header"><h3 class="card-title">Faculty Directory</h3></div>
         ${table(['Name', 'Email', 'Department', 'Status', 'Actions'], result.data.map((row) =>
           `<tr><td>${esc(row.name)}</td><td>${esc(row.email)}</td><td>${esc(row.department)}</td><td>${row.is_active ? 'Active' : 'Inactive'}</td>
-            <td>${actionButton('edit-user', row.id, 'Edit')}
+            <td>${accountActionButton('edit-user', row, 'Edit')}
               ${actionButton('toggle-user', row.id, row.is_active ? 'Deactivate' : 'Activate', row.is_active ? 'btn-danger' : 'btn-secondary')}
-              ${actionButton('reset-password', row.id, 'Reset password')}</td></tr>`).join(''))}</section></div>
+              ${accountActionButton('reset-password', row, 'Reset password')}</td></tr>`).join(''))}</section></div>
       <section class="card"><div class="card-header"><h3 class="card-title">Assign Teacher to Class & Subject</h3></div>
         <form data-action="create-assignment" class="form-grid">
           ${select('Teacher', 'teacher_id', escOptions(teachers.filter((t) => t.is_active), 'id', (t) => `${t.name} (${t.email})`), true)}
-          ${select('Subject', 'subject_id', escOptions(cat.subjects, 'id', (s) => `${s.code} — ${s.name} (${s.branch_id}/${s.semester_id})`), true)}
-          ${select('Section', 'section_id', escOptions(cat.sections, 'id', (s) => {
+          ${select('Subject', 'subject_id', escOptions(cat.subjects, 'id', (s) => `${s.code} — ${s.name} (${s.branch_id}/${s.semester_id})`, 'Select subject'), true)}
+          ${select('Section', 'section_id', escOptions([], 'id', (s) => {
             const branch = cat.branches.find((b) => b.id === s.branch_id);
             const sem = cat.semesters.find((semItem) => semItem.id === s.semester_id);
             return `${branch ? branch.code : ''} ${sem ? sem.name : ''} Section ${s.name}`;
-          }), true)}${submitButton('Assign')}</form>
+          }, 'Select section'), true)}${submitButton('Assign')}</form>
         ${table(['ID', 'Teacher', 'Subject', 'Branch', 'Semester', 'Section', 'Actions'],
           assignmentResult.data.map((a) => `<tr><td>${esc(a.id)}</td><td>${esc(a.teacher)}</td>
             <td>${esc(`${a.subject_code} — ${a.subject}`)}</td><td>${esc(a.branch)}</td>
             <td>${esc(a.semester)}</td><td>${esc(a.section)}</td><td>${actionButton('delete-assignment', a.id, 'Remove', 'btn-danger')}</td></tr>`).join(''))}</section>`);
+    const assignmentForm = document.querySelector('[data-action="create-assignment"]');
+    const subjectControl = assignmentForm.elements.subject_id;
+    const sectionControl = assignmentForm.elements.section_id;
+    const fillAssignmentSections = () => {
+      const subject = cat.subjects.find((item) => String(item.id) === subjectControl.value);
+      const sections = subject ? cat.sections.filter((section) =>
+        section.branch_id === subject.branch_id && section.semester_id === subject.semester_id) : [];
+      const selected = sections.some((section) => String(section.id) === sectionControl.value) ? sectionControl.value : '';
+      sectionControl.innerHTML = escOptions(sections, 'id', (section) => {
+        const branch = cat.branches.find((item) => item.id === section.branch_id);
+        const semester = cat.semesters.find((item) => item.id === section.semester_id);
+        return `${branch ? branch.code : ''} ${semester ? semester.name : ''} Section ${section.name}`;
+      }, 'Select section');
+      sectionControl.value = selected;
+    };
+    subjectControl.addEventListener('change', fillAssignmentSections);
+    fillAssignmentSections();
   }
 
   async function adminReports() {
@@ -454,8 +568,8 @@
   }
 
   const dataResourceConfig = {
-    students: { title: 'Students', columns: ['roll_no', 'name', 'email', 'branch', 'semester', 'section', 'is_active'], fields: [['name', 'Full name', 'text'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['department_id', 'Department', 'department'], ['branch_id', 'Branch', 'branch'], ['semester_id', 'Semester', 'semester'], ['section_id', 'Section', 'section'], ['is_active', 'Account status', 'boolean']] },
-    teachers: { title: 'Teachers', columns: ['username', 'name', 'email', 'department', 'is_active'], fields: [['name', 'Full name', 'text'], ['email', 'Email', 'email'], ['phone', 'Phone', 'tel'], ['department_id', 'Department', 'department'], ['is_active', 'Account status', 'boolean']] },
+    students: { title: 'Students', columns: ['roll_no', 'name', 'email', 'branch', 'semester', 'section', 'is_active'], fields: [['name', 'Full name', 'text'], ['email', 'Email', 'email'], ['phone', 'Phone', 'phone'], ['department_id', 'Department', 'department'], ['branch_id', 'Branch', 'branch'], ['semester_id', 'Semester', 'semester'], ['section_id', 'Section', 'section'], ['is_active', 'Account status', 'boolean']] },
+    teachers: { title: 'Teachers', columns: ['username', 'name', 'email', 'department', 'is_active'], fields: [['name', 'Full name', 'text'], ['email', 'Email', 'email'], ['phone', 'Phone', 'phone'], ['department_id', 'Department', 'department'], ['is_active', 'Account status', 'boolean']] },
     departments: { title: 'Departments', columns: ['id', 'name', 'code'], fields: [['name', 'Name', 'text'], ['code', 'Code', 'text']] },
     branches: { title: 'Branches', columns: ['id', 'name', 'code', 'department'], fields: [['name', 'Name', 'text'], ['code', 'Code', 'text'], ['department_id', 'Department', 'department']] },
     semesters: { title: 'Semesters', columns: ['id', 'number', 'name'], fields: [['number', 'Semester number', 'number'], ['name', 'Name', 'text']] },
@@ -534,7 +648,10 @@
   }
 
   async function studentDashboard() {
-    const [data, attendance] = await Promise.all([api('/dashboard/student'), api('/attendance')]);
+    const [data, attendance, assignments] = await Promise.all([
+      api('/dashboard/student'), api('/attendance'), api('/assignments'),
+    ]);
+    const enrolledSubjects = new Set(assignments.data.map((assignment) => assignment.subject_id)).size;
     const grouped = new Map();
     attendance.data.forEach((record) => {
       const key = `${record.subject_code} · ${record.subject}`;
@@ -553,7 +670,7 @@
     pageTitle(`Welcome, ${user.name}`, `Roll No: ${user.roll_no || user.username} · ${user.role}`, `
       <div class="stats-grid">${stat('Overall Attendance', asPercent(data.attendance.percentage), 'fa-calendar-check')}
         ${stat('Overall Marks', asPercent(data.marks.percentage), 'fa-award')}
-        ${stat('Subjects with marks', data.bySubject.length, 'fa-book')}
+        ${stat('Enrolled subjects', enrolledSubjects, 'fa-book')}
         ${stat('Recent attendance entries', attendance.data.length, 'fa-list-check')}</div>
       <section class="card"><div class="card-header"><h3 class="card-title">Subject-wise attendance breakdown</h3></div>
         ${table(['Subject Code', 'Subject', 'Present / Total', 'Attendance', 'Standing', '75% Target'],
@@ -802,10 +919,41 @@
       for (const [key, , type] of config.fields) {
         if (type === 'number' && fields[key] !== '') fields[key] = Number(fields[key]);
         if (type === 'boolean') fields[key] = fields[key] === '1';
-        if (type === 'tel' && fields[key] === '') fields[key] = null;
+        if ((type === 'tel' || type === 'phone') && fields[key] === '') fields[key] = null;
       }
       await api(`/admin/data/${resource}/${encodeURIComponent(id)}`, { method: 'PATCH', body: fields });
       await adminDataManagement();
+      message('Record updated.');
+      return;
+    }
+    if (action === 'update-user-account') {
+      const { id, resource, ...body } = fields;
+      body.phone = body.phone.trim() || null;
+      await api(`/admin/${resource}/${encodeURIComponent(id)}`, { method: 'PATCH', body });
+      closeAccountDialog(form.closest('dialog'));
+      if (resource === 'students') await adminStudents(); else await adminTeachers();
+      message('Account updated.');
+      return;
+    }
+    if (action === 'reset-user-password') {
+      if (fields.password !== fields.confirm_password) throw new Error('Password and confirmation do not match.');
+      await api(`/admin/users/${encodeURIComponent(fields.id)}/password`, {
+        method: 'POST', body: { password: fields.password },
+      });
+      closeAccountDialog(form.closest('dialog'));
+      message('Password reset.');
+      return;
+    }
+    if (action === 'update-reference') {
+      const { id, resource, ...body } = fields;
+      for (const key of ['number', 'department_id', 'branch_id', 'semester_id']) {
+        if (body[key] !== undefined) body[key] = Number(body[key]);
+      }
+      await api(`/admin/${resource}/${encodeURIComponent(id)}`, { method: 'PATCH', body });
+      closeAccountDialog(form.closest('dialog'));
+      catalog = null;
+      await loadCatalog();
+      await adminReferencePage(resource);
       message('Record updated.');
       return;
     }
@@ -941,12 +1089,27 @@
     };
     const contents = [columns.map(cell).join(','), ...records.map((record) =>
       columns.map((column) => cell(record[column])).join(','))].join('\r\n');
-    const url = URL.createObjectURL(new Blob(['\uFEFF', contents], { type: 'text/csv;charset=utf-8' }));
+    triggerBlobDownload(new Blob(['\uFEFF', contents], { type: 'text/csv;charset=utf-8' }), filename);
+  }
+
+  function triggerBlobDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
+    link.hidden = true;
+    document.body.append(link);
     link.click();
+    link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function downloadFilename(contentDisposition, fallback) {
+    const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(contentDisposition || '');
+    if (!match) return fallback;
+    let filename = decodeURIComponent(match[1].trim().replace(/"$/, ''));
+    filename = filename.split(/[\\/]/).pop().replace(/[\u0000-\u001f\u007f]/g, '');
+    return filename || fallback;
   }
 
   async function downloadFilteredDataCsv() {
@@ -962,12 +1125,7 @@
       throw new Error(result.error || `CSV export failed (${response.status}).`);
     }
     const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${dataResource}.csv`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    triggerBlobDownload(blob, downloadFilename(response.headers.get('content-disposition'), `${dataResource}.csv`));
   }
 
   async function clickAction(button) {
@@ -1015,7 +1173,7 @@
             return select(label, key, ['Present', 'Absent', 'Late', 'Excused'].map((status) =>
               `<option ${value === status ? 'selected' : ''}>${status}</option>`).join(''), true);
           }
-          return input(label, key, type === 'tel' ? 'tel' : type, true, '', value);
+          return input(label, key, type === 'tel' || type === 'phone' ? 'tel' : type, type !== 'phone', '', value);
         }).join('');
         panel.innerHTML = `<h2 class="card-title">Edit ${esc(dataResourceConfig[dataResource].title)} record #${esc(id)}</h2>
           <form data-action="update-data-record"><input type="hidden" name="resource" value="${esc(dataResource)}">
@@ -1064,55 +1222,13 @@
     }
     if (action === 'edit-reference') {
       const resource = new URLSearchParams(location.search).get('view') || pageName.replace('admin_', '');
-      const row = button.closest('tr');
-      if (resource === 'semesters') {
-        const number = window.prompt('Semester number (1–12):', row.cells[1].textContent.trim());
-        if (number == null || !number.trim()) return;
-        const name = window.prompt('Semester name:', row.cells[2].textContent.trim());
-        if (name == null || !name.trim()) return;
-        await api(`/admin/${resource}/${id}`, { method: 'PATCH', body: { number: Number(number), name: name.trim() } });
-        catalog = null;
-        await loadCatalog();
-        await adminReferencePage(resource);
-        message('Record updated.');
-        return;
-      }
-      if (resource === 'sections') {
-        const name = window.prompt('Section name:', row.cells[1].textContent.trim());
-        if (name == null || !name.trim()) return;
-        const current = catalog.sections.find((item) => item.id === id);
-        const branchId = window.prompt('Branch ID:', current ? current.branch_id : '');
-        if (branchId == null || !branchId.trim()) return;
-        const semesterId = window.prompt('Semester ID:', current ? current.semester_id : '');
-        if (semesterId == null || !semesterId.trim()) return;
-        await api(`/admin/${resource}/${id}`, { method: 'PATCH', body: {
-          name: name.trim(), branch_id: Number(branchId), semester_id: Number(semesterId),
-        } });
-        catalog = null;
-        await loadCatalog();
-        await adminReferencePage(resource);
-        message('Record updated.');
-        return;
-      }
-      const nameIndex = resource === 'subjects' ? 2 : 1;
-      const codeIndex = resource === 'subjects' ? 1 : 2;
-      const rowName = window.prompt('Enter the updated name:', row.cells[nameIndex].textContent.trim());
-      if (rowName == null || !rowName.trim()) return;
-      const code = window.prompt('Enter the updated code:', row.cells[codeIndex].textContent.trim());
-      if (code == null) return;
-      const body = { name: rowName.trim() };
-      if (code.trim()) body.code = code.trim();
-      await api(`/admin/${resource}/${id}`, { method: 'PATCH', body });
-      if (resource !== 'departments') {
-        catalog = null;
-        await loadCatalog();
-      }
-      await adminReferencePage(resource);
-      message('Record updated.');
+      const row = catalog[resource]?.find((item) => item.id === id);
+      if (!row) throw new Error('Reference record not found. Refresh the page and try again.');
+      openReferenceDialog(resource, row);
       return;
     }
     if (action === 'delete-assignment') {
-      if (!window.confirm('Remove this teaching assignment?')) return;
+      if (!window.confirm('Remove this teaching assignment? Its attendance, assessments, and marks will also be deleted. This cannot be undone.')) return;
       await api(`/admin/assignments/${id}`, { method: 'DELETE' });
       await adminTeachers();
       message('Assignment removed.');
@@ -1127,26 +1243,15 @@
       return;
     }
     if (action === 'reset-password') {
-      const password = window.prompt('Enter a temporary password (at least 8 characters):');
-      if (password == null) return;
-      await api(`/admin/users/${id}/password`, { method: 'POST', body: { password } });
-      message('Password reset.');
+      openAccountDialog(button, action);
       return;
     }
     if (action === 'edit-user') {
-      const row = button.closest('tr');
-      const cells = row.querySelectorAll('td');
-      const currentName = cells[pageName === 'admin_students' ? 1 : 0].textContent.trim();
-      const name = window.prompt('Full name:', currentName);
-      if (name == null || !name.trim()) return;
-      const phone = window.prompt('Phone number (leave blank to keep unchanged):', '');
-      if (phone == null) return;
-      const body = { name: name.trim() };
-      if (phone.trim()) body.phone = phone.trim();
-      const resource = pageName === 'admin_students' ? 'students' : 'teachers';
-      await api(`/admin/${resource}/${id}`, { method: 'PATCH', body });
-      if (resource === 'students') await adminStudents(); else await adminTeachers();
-      message('Account updated.');
+      openAccountDialog(button, action);
+      return;
+    }
+    if (action === 'close-account-dialog') {
+      closeAccountDialog(button.closest('dialog'));
       return;
     }
     if (action === 'load-mark-roster') {
@@ -1164,7 +1269,9 @@
         await clickAction(action);
       }
     } catch (error) {
-      message(error.message, true);
+      const dialogMessage = document.querySelector('.portal-account-dialog [data-dialog-message]');
+      if (dialogMessage) dialogMessage.textContent = error.message;
+      else message(error.message, true);
     }
   }
 

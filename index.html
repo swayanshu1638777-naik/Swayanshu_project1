@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SSIPMT Campus Portal — Campus life, in one place</title>
-<meta name="description" content="A simple home for SSIPMT attendance, academic progress, and campus services.">
+<title>Smart Student Attendance and Management Portal</title>
+<meta name="description" content="Manage student attendance, academic progress, and campus services through the SSIPMT portal.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 24'%3E%3Crect width='22' height='24' fill='%234a4d44'/%3E%3Cpath fill='%23fff' d='M11 1.3c-2.1 0-3.95 1.2-4.75 2.95C3.95 4.55 2.3 6.25 2.3 8.35c0 2.3 1.9 4.2 4.3 4.2h8.8c2.4 0 4.3-1.9 4.3-4.2 0-2.1-1.65-3.8-4-4.1C14.95 2.5 13.1 1.3 11 1.3Z'/%3E%3Cpath fill='%23fff' d='M9.6 12.55h2.8v4.2c1.35.3 2.45 1.15 3.15 2.4-1.35.4-2.4.15-3.15-.4v4.15H9.6v-4.15c-.75.55-1.8.8-3.15.4.7-1.25 1.8-2.1 3.15-2.4v-4.2Z'/%3E%3C/svg%3E">
 <script>document.documentElement.className += " js";</script>
 <style>
@@ -26,7 +26,6 @@
 
     --card:           #f2f3ef;
     --card-ink:       #23261f;
-    --card-label:     #7c8177;
 
     --ease: cubic-bezier(.22,.61,.36,1);
     --ease-out: cubic-bezier(.16,1,.3,1);
@@ -35,7 +34,7 @@
 
   *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
 
-  html{ background:#383b34; }
+  html{ background:#383b34; scroll-behavior:smooth; }
   body{
     font-family:'Lexend',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     font-weight:300;
@@ -94,13 +93,16 @@
   /* ── ghost wordmark (z 1) ────────────────────────────────────────────── */
   .ghost{
     position:absolute; z-index:1;
-    left:calc(6 * var(--u)); bottom:calc(-64 * var(--u));
-    font-size:calc(310 * var(--u));
-    line-height:.78;
+    top:calc(8 * var(--u)); left:calc(36 * var(--u));
+    width:calc(1100 * var(--u));
+    font-size:calc(110 * var(--u));
+    line-height:.9;
     font-weight:400;
-    letter-spacing:calc(30 * var(--u));
-    color:rgba(255,255,255,.055);
-    white-space:nowrap; user-select:none; pointer-events:none;
+    letter-spacing:calc(2 * var(--u));
+    color:rgba(255,255,255,.12);
+    text-align:left;
+    text-transform:uppercase;
+    user-select:none; pointer-events:none;
   }
 
   /* ── three.js canvas (z 3 — above card 1, below everything else) ─────── */
@@ -113,16 +115,17 @@
   .is-ready #scene{ opacity:1; }
 
   /* ── nav: a floating dock (z 5) ──────────────────────────────────────
-     A centred capsule of pills that magnify as the pointer nears them, over
+     A right-aligned capsule of pills that magnify as the pointer nears them, over
      a rim highlight that tracks where the pointer is — the dock idiom from
      ascii-page-transition, in this page's palette and unit system.
-     The wrapper does the centring so the capsule itself is free to carry the
+     The wrapper handles alignment so the capsule itself is free to carry the
      pointer-parallax transform; putting both on one element means whichever
      is written last wins and the dock jumps out of centre. */
   .dock-wrap{
     position:absolute; z-index:5;
     top:calc(38 * var(--u)); left:0; right:0;
-    display:flex; justify-content:center;
+    display:flex; justify-content:flex-end;
+    padding-right:calc(36 * var(--u));
     pointer-events:none;
   }
   .dock{
@@ -144,7 +147,7 @@
                inset 0 1px rgba(255,255,255,.06);
     isolation:isolate;
   }
-  /* Anchored at the top so growth runs downward, out of the headline's way —
+  /* Anchored at the top so growth runs downward, away from the hero scene —
      a dock that grew from its centre would push into the nav's own row. */
   .dock-item{
     position:relative; z-index:6;
@@ -228,36 +231,13 @@
   }
   .dock{ position:relative; }
 
-  /* ── hero copy (z 4) ─────────────────────────────────────────────────── */
-  .headline{
-    position:absolute; z-index:4;
-    left:calc(46 * var(--u)); top:calc(202 * var(--u));
-    font-size:calc(63 * var(--u)); line-height:calc(65 * var(--u));
-    font-weight:300; letter-spacing:calc(-0.4 * var(--u));
-    color:var(--ink);
-  }
-  /* No overflow clip: cropping a 63u face to wipe it in cuts the descenders
-     of "Step" and "living" at the moment they land. The padding stays even
-     though the clip is gone — it set the two lines' metrics, and removing it
-     would shift line two. */
-  .headline span{ display:block; padding-bottom:.04em; }
-  .headline span i{ display:inline-block; font-style:normal; }
-
-  .lede{
-    position:absolute; z-index:4;
-    left:calc(520 * var(--u)); top:calc(196 * var(--u));
-    width:calc(208 * var(--u));
-    font-size:calc(16.5 * var(--u)); line-height:calc(22 * var(--u));
-    font-weight:300; color:var(--ink-soft);
-  }
-
   /* ── liquid-metal controls ──────────────────────────────────────────
      The original five-pass WebGL2 renderer now mounts directly in this
      document. Its canvas, sizing, glass plate, shader constants and input
      model are unchanged; only the iframe boundary has been removed. */
   .pill-clip{
     position:absolute; z-index:4;
-    left:calc(644 * var(--u)); top:calc(360 * var(--u));
+    left:calc(800 * var(--u)); top:calc(800 * var(--u));
     width:calc(410 * var(--u)); height:calc(270 * var(--u));
     margin:calc(-135 * var(--u)) 0 0 calc(-205 * var(--u));
     clip-path:inset(calc(72 * var(--u)) calc(60 * var(--u))
@@ -360,7 +340,7 @@
   /* ── play button (z 4) ─────────────────────────────────────────────── */
   .play-wrap{
     position:absolute; z-index:4; pointer-events:none;
-    left:calc(187 * var(--u)); top:calc(431 * var(--u));
+    left:calc(120 * var(--u)); top:calc(431 * var(--u));
     width:calc(170 * var(--u)); height:calc(170 * var(--u));
   }
   .play-wrap > *{ pointer-events:auto; }
@@ -396,106 +376,6 @@
   .stat .mark svg{ filter:drop-shadow(0 calc(2 * var(--u)) calc(10 * var(--u)) rgba(10,14,8,.6)); }
   .stat dd{ font-size:calc(13.5 * var(--u)); font-weight:600; color:var(--ink); line-height:calc(21 * var(--u)); }
 
-  /* ── cards ───────────────────────────────────────────────────────────── */
-  .card{
-    position:absolute;
-    background:var(--card); border-radius:calc(46 * var(--u));
-    box-shadow:0 calc(30 * var(--u)) calc(70 * var(--u)) rgba(16,21,13,.30);
-    transition:box-shadow .8s var(--ease);
-  }
-  /* No z-index here on purpose. z-index:auto keeps the card out of its own
-     stacking context, so the body paints under #scene (the moss drapes over
-     its shoulder) while .knob, at z 4, still sits in front of the moss. */
-  .card--about{
-    left:calc(890 * var(--u)); top:calc(200 * var(--u));
-    width:calc(330 * var(--u)); height:calc(305 * var(--u));
-  }
-  .card--stove{
-    z-index:4; will-change:transform;
-    left:calc(1237 * var(--u)); top:calc(482 * var(--u));
-    width:calc(328 * var(--u)); height:calc(310 * var(--u));
-  }
-  .card .label{
-    position:absolute; left:calc(38 * var(--u));
-    font-size:calc(15.5 * var(--u)); font-weight:300; color:var(--card-label);
-  }
-  .card h2{
-    position:absolute; left:calc(38 * var(--u));
-    font-size:calc(26.2 * var(--u)); line-height:calc(27 * var(--u));
-    font-weight:400; letter-spacing:calc(-0.5 * var(--u)); color:var(--card-ink);
-  }
-  .card--about .label{ top:calc(152 * var(--u)); }
-  .card--about h2{ top:calc(177 * var(--u)); width:calc(142 * var(--u)); }
-  .card--stove .label{ top:calc(45 * var(--u)); }
-  .card--stove h2{ top:calc(70 * var(--u)); }
-  /* Both cards carry a plate. The Field Note reads downward — label, title,
-     then the photograph — so its window sits at the foot of the card; the
-     Ethos card reads the other way up, so its window is at the head and the
-     copy sits under it. Same frame, mirrored. */
-  .card figure{
-    position:absolute; left:calc(14 * var(--u)); right:calc(14 * var(--u));
-    border-radius:calc(34 * var(--u)); overflow:hidden;
-    isolation:isolate; background:#263025;
-  }
-  .card--stove figure{ bottom:calc(14 * var(--u)); height:calc(158 * var(--u)); }
-  .card--about figure{ top:calc(14 * var(--u)); height:calc(122 * var(--u)); }
-  /* The plate is its own depth plane. It travels against the card and the
-     moss, so the landscape feels like a small window rather than a
-     photograph glued to the surface. */
-  .portal-media{
-    position:absolute; inset:calc(-9 * var(--u)); z-index:1; display:block;
-    will-change:transform,clip-path;
-    transform:
-      perspective(900px)
-      translate3d(calc(var(--px,0) * -11px),calc(var(--py,0) * -7px),0)
-      rotateY(calc(var(--px,0) * -1.4deg))
-      rotateX(calc(var(--py,0) * .9deg));
-    transform-origin:50% 50%;
-  }
-  .portal-media img{
-    width:100%; height:100%; object-fit:cover; display:block;
-    transform:scale(1.08);
-    filter:saturate(.92) contrast(1.03);
-    transition:transform 1.25s var(--ease-out),filter .8s var(--ease);
-  }
-  .card:hover .portal-media img{ transform:scale(1.13); filter:saturate(1.04) contrast(1.04); }
-  .pixel-reveal{
-    position:absolute; inset:0; z-index:3; width:100%; height:100%;
-    pointer-events:none; opacity:0; mix-blend-mode:screen;
-  }
-  /* The white scan rides the clip edge, so its centre has to travel the
-     media element's box, not the figure's — .portal-media is overscanned by
-     9u on every side to give the parallax rotation somewhere to go. Offsetting
-     by that 9u in calc() rather than by a translate percentage keeps the
-     glow on the edge at every breakpoint, whatever size the plate is. */
-  .card figure::after{
-    content:''; position:absolute; z-index:2;
-    filter:blur(calc(2 * var(--u))); opacity:0; pointer-events:none;
-    top:0; bottom:0; width:26%; left:calc(-13% - 9 * var(--u));
-    background:linear-gradient(90deg,transparent,rgba(229,244,209,.2) 42%,rgba(252,255,246,.72) 54%,transparent);
-  }
-
-  .knob-float{
-    position:absolute; z-index:4; pointer-events:none;
-    left:calc(1142 * var(--u)); top:calc(427 * var(--u));
-    width:calc(58 * var(--u)); height:calc(58 * var(--u));
-  }
-  .knob-float > *{ pointer-events:auto; }
-  .knob--about{ left:0; top:0; }
-  .card .knob, .knob--about{
-    position:absolute; z-index:4; right:calc(20 * var(--u)); bottom:calc(20 * var(--u));
-    width:calc(58 * var(--u)); height:calc(58 * var(--u));
-    border:0; border-radius:50%; cursor:pointer;
-    background:#fbfcf8; display:grid; place-items:center;
-    box-shadow:0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(16,21,13,.18);
-    transition:transform .5s var(--ease-out), background .4s var(--ease);
-  }
-  .knob--about{ right:auto; bottom:auto; width:calc(58 * var(--u)); height:calc(58 * var(--u)); }
-  .card--stove .knob{ width:calc(54 * var(--u)); height:calc(54 * var(--u)); right:calc(26 * var(--u)); bottom:calc(26 * var(--u)); }
-  .card .knob svg, .knob--about svg{ width:calc(19 * var(--u)); height:calc(19 * var(--u)); display:block; color:#3f453a; }
-  .card .knob:hover, .knob--about:hover{ transform:scale(1.1) rotate(8deg); background:#fff; }
-  .card:hover{ box-shadow:0 calc(38 * var(--u)) calc(84 * var(--u)) rgba(16,21,13,.36); }
-
   /* ── scroll cue (z 4) ────────────────────────────────────────────────── */
   .scroll{
     position:absolute; z-index:4;
@@ -523,8 +403,7 @@
   /* ── entrance: everything is wiped in behind a mask ───────────────────
      Transform is reserved for the pointer parallax, so the reveal is done
      with clip-path. Once the intro has run, .intro-done drops the clip
-     entirely — a live clip-path would open a stacking context on the About
-     card and trap its knob under the moss. */
+     entirely so the elements return to their normal stacking behavior. */
   .js .mask{ clip-path:inset(100% 0 0 0 round var(--mr,0px)); }
   .is-ready .mask{
     clip-path:inset(0 0 0 0 round var(--mr,0px));
@@ -540,8 +419,6 @@
 
   .intro-done .mask, .intro-done .mask-circle{ clip-path:none; transition:none; }
 
-  .card{ --mr:calc(46 * var(--u)); }
-
   /* the dock drops in tile by tile; the capsule itself only fades, because
      a clip on it would cut the pills off as they magnify past its edge */
   .js .dock{ opacity:0; }
@@ -553,44 +430,6 @@
                color .18s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
   }
   .intro-done .dock-item{ clip-path:none; }
-
-  /* A short rise under a fade rather than a full-height wipe: with nothing
-     cropping it, a 105% travel would start line one sitting on top of line
-     two. .headline itself carries the pointer parallax, so the transform has
-     to go on the inner <i>. */
-  .js .headline span i{ opacity:0; transform:translateY(calc(16 * var(--u))); }
-  .is-ready .headline span i{
-    opacity:1; transform:none;
-    transition:opacity 1.05s var(--ease) var(--d,0ms),
-               transform 1.25s var(--ease-out) var(--d,0ms);
-  }
-
-  /* Each plate resolves like a low-bandwidth botanical transmission: a
-     stepped clip exposes the photograph while sampled pixel-dots gather along
-     the advancing edge (the dots themselves are painted by canvas).
-     Both plates scan across, the Ethos one a beat ahead of the Field Note. */
-  .js .portal-media{ clip-path:inset(0 100% 0 0 round calc(25 * var(--u))); }
-  .is-ready .card--about .portal-media{ animation:portal-cut 1.45s steps(12,end) .92s both; }
-  .is-ready .card--stove .portal-media{ animation:portal-cut 1.45s steps(12,end) 1.08s both; }
-  .is-ready .card--about figure::after{ animation:portal-scan 1.45s steps(12,end) .92s both; }
-  .is-ready .card--stove figure::after{ animation:portal-scan 1.45s steps(12,end) 1.08s both; }
-  .intro-done .portal-media{ clip-path:none; animation:none; }
-  @keyframes portal-cut{
-    from{ clip-path:inset(0 100% 0 0 round calc(25 * var(--u))); }
-    to{ clip-path:inset(0 0 0 0 round calc(25 * var(--u))); }
-  }
-  /* The glow travels by animating its own offset, not by a translate
-     percentage. A translate is a percentage of the glow's width, so the
-     distance it covers depends on the plate's proportions — it overshot by
-     a quarter of the card here and rode ahead of the edge the whole way.
-     In calc() the travel is exactly the media box: 100% of the plate plus
-     the 9u of overscan at each end, at every breakpoint. */
-  @keyframes portal-scan{
-    0%{ left:calc(-13% - 9 * var(--u)); opacity:0; }
-    10%{ opacity:.75; }
-    88%{ opacity:.55; }
-    100%{ left:calc(87% + 9 * var(--u)); opacity:0; }
-  }
 
   /* No clip on the canvas: the root draws itself in behind the survey pulse,
      and a CSS wipe on top of that would be two reveals fighting each other.
@@ -610,27 +449,17 @@
       rotateY(calc(var(--px,0) * var(--pr,0) * 1deg))
       rotateX(calc(var(--py,0) * var(--pr,0) * -0.7deg));
   }
-  /* the floating knob turns about the About card's centre, not its own,
-     so it stays glued to the corner it belongs to */
-  .knob-float{ transform-origin:calc(-87 * var(--u)) calc(-74.5 * var(--u)); }
-  .card--about{ transform-origin:50% 50%; }
-
   /* ── keyboard focus ──────────────────────────────────────────────────── */
   a:focus-visible, button:focus-visible{
     outline:2px solid rgba(255,255,255,.85);
     outline-offset:calc(4 * var(--u));
     border-radius:calc(6 * var(--u));
   }
-  .card .knob:focus-visible, .knob--about:focus-visible, .play:focus-visible{ outline-color:rgba(28,34,22,.9); }
-
   @media (prefers-reduced-motion:reduce){
+    html{ scroll-behavior:auto; }
     .mask,.mask-circle,.fade,#scene,
-    .dock,.dock-item,
-    .headline span i{ opacity:1 !important; clip-path:none !important; transform:none !important; transition:none !important; }
+    .dock,.dock-item{ opacity:1 !important; clip-path:none !important; transform:none !important; transition:none !important; }
     .par{ transform:none !important; }
-    .portal-media{ clip-path:none !important; animation:none !important; transform:none !important; }
-    .pixel-reveal,.card figure::after{ display:none !important; }
-    .portal-media img{ transform:none !important; transition:none !important; }
     .scroll .track::after{ animation:none; }
     #scene{ transition:none; }
   }
@@ -658,7 +487,7 @@
     /* Floored with max(), not left on the design unit alone: this breakpoint
        runs from 900px down to 320px, so a pure --u dock is a 24px bar with
        12px targets on a phone. The floor only bites at the small end. */
-    .dock-wrap{ top:calc(30 * var(--u)); }
+    .dock-wrap{ top:calc(30 * var(--u)); padding-right:calc(20 * var(--u)); }
     .dock{
       height:max(56px, calc(58 * var(--u)));
       padding:max(6px, calc(6 * var(--u)));
@@ -673,12 +502,9 @@
     .dock-item span:not(.glyph){ display:none; }
     .dock-item .glyph{ width:max(19px, calc(20 * var(--u))); height:max(19px, calc(20 * var(--u))); }
     .dock-mark svg{ width:52%; height:52%; }
-    .knob-float{ left:calc(644 * var(--u)); top:calc(1218 * var(--u)); transform-origin:calc(-264 * var(--u)) calc(-43 * var(--u)); }
-    .headline{ left:calc(34 * var(--u)); top:calc(128 * var(--u)); font-size:calc(62 * var(--u)); line-height:calc(66 * var(--u)); }
-    .lede{ left:calc(34 * var(--u)); top:calc(288 * var(--u)); width:calc(400 * var(--u)); font-size:calc(19 * var(--u)); line-height:calc(27 * var(--u)); }
-    /* one column: the frame keeps its aspect, re-anchored to the left rail */
+    /* Keep the liquid control's frame centered on the narrow layout. */
     .pill-clip{
-      left:calc(34 * var(--u)); top:calc(430 * var(--u));
+      left:calc(206 * var(--u)); top:calc(1460 * var(--u));
       width:calc(506 * var(--u)); height:calc(334 * var(--u));
       margin:calc(-167 * var(--u)) 0 0 calc(-79 * var(--u));
       clip-path:inset(calc(93 * var(--u)) calc(74 * var(--u)) calc(1 * var(--u)) calc(74 * var(--u)) round calc(76 * var(--u)));
@@ -693,21 +519,8 @@
     .stat--a{ left:calc(34 * var(--u));  top:calc(540 * var(--u)); }
     .stat--b{ left:calc(396 * var(--u)); top:calc(540 * var(--u)); }
 
-    .card{ border-radius:calc(40 * var(--u)); }
-    .card--about{ left:calc(34 * var(--u)); top:calc(1050 * var(--u)); width:calc(692 * var(--u)); height:calc(250 * var(--u)); }
-    .card--about .label{ top:calc(96 * var(--u)); }
-    .card--about h2{ top:calc(124 * var(--u)); width:calc(400 * var(--u)); font-size:calc(32 * var(--u)); line-height:calc(36 * var(--u)); }
-    .card--stove{ left:calc(34 * var(--u)); top:calc(1324 * var(--u)); width:calc(692 * var(--u)); height:calc(268 * var(--u)); }
-    .card--stove h2{ font-size:calc(32 * var(--u)); }
-    /* one column: both plates become a thumbnail on the card's outer edge,
-       the Ethos one still anchored to the top */
-    .card--stove figure{ left:auto; right:calc(16 * var(--u)); bottom:calc(16 * var(--u)); width:calc(300 * var(--u)); height:calc(150 * var(--u)); }
-    .card--about figure{ left:auto; right:calc(16 * var(--u)); top:calc(16 * var(--u)); width:calc(224 * var(--u)); height:calc(218 * var(--u)); }
-    .card .knob{ right:calc(24 * var(--u)); bottom:calc(24 * var(--u)); }
-    .card--stove .knob{ right:calc(30 * var(--u)); bottom:calc(30 * var(--u)); }
-
     .scroll{ left:calc(702 * var(--u)); top:calc(470 * var(--u)); }
-    .ghost{ font-size:calc(184 * var(--u)); letter-spacing:calc(14 * var(--u)); bottom:calc(660 * var(--u)); left:calc(-10 * var(--u)); }
+    .ghost{ top:calc(8 * var(--u)); left:calc(20 * var(--u)); width:calc(700 * var(--u)); font-size:calc(46 * var(--u)); letter-spacing:calc(1 * var(--u)); line-height:.9; }
   }
 </style>
 <link rel="stylesheet" href="css/campus-sections.css">
@@ -762,36 +575,7 @@
       <i style="left:calc(1091 * var(--u))"></i>
     </div>
 
-    <div class="ghost fade" style="--d:1150ms" aria-hidden="true">SSIPMT</div>
-
-    <!-- card 1 sits *behind* the canvas so the moss drapes over its shoulder -->
-    <article class="card card--about mask" style="--d:760ms; --pd:10; --pr:2.2">
-      <figure class="portal" data-delay="920">
-        <span class="portal-media"><img src="assets/inner-green-assets/card-ethos.jpg" alt="A cushion of moss grown over lichen-crusted stones" loading="eager" decoding="async"></span>
-        <canvas class="pixel-reveal" aria-hidden="true"></canvas>
-      </figure>
-      <p class="label">SSIPMT Raipur · Smart Campus</p>
-      <h2>Campus life.</h2>
-    </article>
-
-    <!-- the About knob rides *outside* the card: the card has to stay a plain
-         painted box under #scene, so anything that must sit in front of the
-         moss lives here instead, sharing the card's parallax origin -->
-    <span class="knob-float" style="--pd:10; --pr:2.2">
-      <button class="knob knob--about mask-circle" style="--d:1100ms" aria-label="Explore campus features">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 21v-7"/><path d="M12 14c0-3.3 2.4-6 5.5-6 .3 3.6-2.2 6.4-5.5 6Z"/>
-          <path d="M12 16c-.1-2.9-2.2-5.2-4.9-5.2C6.8 13.7 9 16 12 16Z"/>
-        </svg>
-      </button>
-    </span>
-
-    <h1 class="headline" style="--pd:18; --pr:1.2">
-      <span><i style="--d:260ms">Campus life,</i></span>
-      <span><i style="--d:360ms">in one place.</i></span>
-    </h1>
-
-    <p class="lede mask" style="--d:480ms; --pd:14; --pr:1">A simple home for attendance, academic progress, and the everyday things that keep college moving.</p>
+    <div class="ghost fade" style="--d:1150ms" aria-hidden="true">Smart Student Attendance and Management Portal</div>
 
     <div class="pill-clip">
       <div class="pill mask" style="--d:600ms; --pd:15; --pr:1.4">
@@ -818,7 +602,7 @@
           <span class="liquid-stage liquid-stage--play" data-liquid-metal="play">
             <span class="liquid-plate plate" aria-hidden="true"></span>
             <canvas class="liquid-fx" aria-hidden="true"></canvas>
-            <button class="liquid-button liquid-button--play btn" type="button" aria-label="Explore campus features">
+            <button class="liquid-button liquid-button--play btn" type="button" aria-label="Scroll to portal features">
               <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M8 5.2v13.6L19 12z" fill="currentColor"/>
               </svg>
@@ -852,21 +636,6 @@
       </span>
       <div><dt>Faculty</dt><dd>Class tools</dd></div>
     </dl>
-
-    <article class="card card--stove mask" style="--d:880ms; --pd:22; --pr:2.4">
-      <p class="label">Academic progress</p>
-      <h2>Results, in reach.</h2>
-      <figure class="portal" data-delay="1080">
-        <span class="portal-media"><img src="assets/inner-green-assets/card-ecostove.jpg" alt="Moss-covered boulders in a misty grove" loading="eager" decoding="async"></span>
-        <canvas class="pixel-reveal" aria-hidden="true"></canvas>
-      </figure>
-      <button class="knob" aria-label="Open academic progress">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 21v-7"/><path d="M12 14c0-3.3 2.4-6 5.5-6 .3 3.6-2.2 6.4-5.5 6Z"/>
-          <path d="M12 16c-.1-2.9-2.2-5.2-4.9-5.2C6.8 13.7 9 16 12 16Z"/>
-        </svg>
-      </button>
-    </article>
 
     <a class="scroll mask" style="--d:1040ms; --pd:9" href="#features">Explore the portal<span class="track"></span></a>
 
@@ -1780,8 +1549,7 @@ window.__seek   = v => { clock = v; drawn = null; };
      they are the furthest plane, their travel would be a few pixels, and
      promoting two near-full-stage boxes to composited layers cost more
      frames than the effect was worth. */
-  var PARALLAX = '.dock,.headline,.lede,.pill,.play-wrap,' +
-                 '.stat--a,.stat--b,.card--about,.knob-float,.card--stove,.scroll';
+  var PARALLAX = '.dock,.pill,.play-wrap,.stat--a,.stat--b,.scroll';
 
   var pointer = { x: 0, y: 0 }, smooth = { x: 0, y: 0 };
   var heroEl = document.getElementById('hero');
@@ -1866,128 +1634,6 @@ window.__seek   = v => { clock = v; drawn = null; };
   var SCAN_DUR = 3.4;
   var clock = null;
   var readyStarted = false;
-
-  /* ── plate transmission ─────────────────────────────────────────────
-     Sample the actual photograph into a tiny grid and carry those colours
-     along the stepped clip edge. The canvas exists for this one entrance
-     only; after the reveal it stops painting and the live image takes over.
-
-     The dot front, the white scan and the CSS clip all have to sit on the
-     same line, which means reproducing the CSS progression exactly rather
-     than approximating it: floor(t * STEPS) / STEPS, linear — an eased
-     curve here put the dots a third of a plate ahead of the edge they are
-     supposed to be gathering on. The clip is applied to .portal-media,
-     which is overscanned past the figure by 9u so the parallax rotation has
-     somewhere to go, so the front has to be converted out of that box and
-     into the canvas's before it is painted. */
-  var CUT_STEPS = 12, CUT_MS = 1450;
-  var portalStarted = false;
-
-  function startPortalReveal() {
-    if (REDUCED || portalStarted) return;
-    portalStarted = true;
-    var figs = document.querySelectorAll('.portal');
-    for (var i = 0; i < figs.length; i++) revealPortal(figs[i]);
-  }
-
-  function revealPortal(fig) {
-    var img = fig.querySelector('img');
-    var canvasEl = fig.querySelector('.pixel-reveal');
-    var media = fig.querySelector('.portal-media');
-    if (!img || !canvasEl || !media) return;
-
-    var delay = parseFloat(fig.getAttribute('data-delay')) || 1080;
-
-    function launch() {
-      setTimeout(function () {
-        var box = canvasEl.getBoundingClientRect();
-        if (!box.width || !box.height) return;
-
-        var dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvasEl.width = Math.max(1, Math.round(box.width * dpr));
-        canvasEl.height = Math.max(1, Math.round(box.height * dpr));
-        var ctx = canvasEl.getContext('2d');
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-        var cols = 52;
-        var rows = Math.max(18, Math.round(cols * box.height / box.width));
-
-        var sample = document.createElement('canvas');
-        sample.width = cols; sample.height = rows;
-        var sg = sample.getContext('2d', { willReadFrequently:true });
-        var rgba = null;
-        try {
-          sg.drawImage(img, 0, 0, cols, rows);
-          rgba = sg.getImageData(0, 0, cols, rows).data;
-        } catch (err) {
-          /* file:// can make canvas pixels unreadable; the reveal still runs
-             with the page's pale-moss transmission colour. */
-        }
-
-        /* layout offsets, not bounding rects — .portal-media carries a live
-           transform and its rect would drift with the pointer */
-        var over = -media.offsetLeft;
-        var span = media.offsetWidth;
-        var reach = box.width;
-
-        canvasEl.style.opacity = '1';
-        var startedAt = performance.now();
-
-        function paint(now) {
-          var t = Math.min(1, (now - startedAt) / CUT_MS);
-          var stepped = Math.floor(t * CUT_STEPS) / CUT_STEPS;
-          var front = (stepped * span - over) / reach;
-          var tailFade = t < .88 ? 1 : (1 - t) / .12;
-          ctx.clearRect(0, 0, box.width, box.height);
-
-          for (var y = 0; y < rows; y++) {
-            for (var x = 0; x < cols; x++) {
-              var an = (x + .5) / cols;
-              var delta = an - front;
-              /* symmetric about the front: an asymmetric band puts the
-                 pattern's centre of mass ahead of the edge it belongs to */
-              if (delta < -.16 || delta > .16) continue;
-
-              var band = 1 - Math.abs(delta) / .16;
-              var pulse = .68 + .32 * Math.sin(x * 2.71 + y * 1.93 + t * 26);
-              var alpha = Math.max(0, band * pulse * tailFade);
-              if (alpha < .08) continue;
-
-              var r = 220, g = 238, b = 202;
-              if (rgba) {
-                var q = (y * cols + x) * 4;
-                r = Math.min(255, rgba[q] * 1.18 + 20);
-                g = Math.min(255, rgba[q + 1] * 1.18 + 24);
-                b = Math.min(255, rgba[q + 2] * 1.12 + 14);
-              }
-
-              var px = (x + .5) * box.width / cols;
-              var py = (y + .5) * box.height / rows;
-              var jitter = (1 - band) * 5;
-              px += Math.sin(y * 3.17 + x) * jitter;
-              py += Math.cos(x * 2.41 - y) * jitter;
-              var radius = (.55 + band * 1.25) * Math.max(.75, reach / 300);
-
-              ctx.fillStyle = 'rgba(' + Math.round(r) + ',' + Math.round(g) + ',' + Math.round(b) + ',' + (alpha * .92) + ')';
-              ctx.beginPath();
-              ctx.arc(px, py, radius, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-
-          if (t < 1) requestAnimationFrame(paint);
-          else {
-            ctx.clearRect(0, 0, box.width, box.height);
-            canvasEl.style.opacity = '0';
-          }
-        }
-        requestAnimationFrame(paint);
-      }, delay);
-    }
-
-    if (img.complete && img.naturalWidth) launch();
-    else img.addEventListener('load', launch, { once:true });
-  }
 
   /* ── the dock ────────────────────────────────────────────────────────
      Proximity magnification over a rim highlight that points back at the
@@ -2179,7 +1825,6 @@ window.__seek   = v => { clock = v; drawn = null; };
     root.addEventListener('click', function (e) {
       var item = e.target.closest('[data-dock]');
       if (!item) return;
-      e.preventDefault();
       if (!item.classList.contains('dock-mark')) {
         for (var i = 0; i < DOCK.items.length; i++) DOCK.items[i].el.classList.remove('is-active');
         item.classList.add('is-active');
@@ -2199,10 +1844,8 @@ window.__seek   = v => { clock = v; drawn = null; };
     void document.body.offsetHeight;
     document.body.classList.add('is-ready');
     startParallax();
-    startPortalReveal();
     initDock();
-    /* the wipes are done — drop the clips so nothing keeps a stacking
-       context alive (the About knob has to stay above the moss) */
+    /* Drop the entrance clips once all elements have finished appearing. */
     setTimeout(function () { document.body.classList.add('intro-done'); }, REDUCED ? 0 : 2900);
   }
 

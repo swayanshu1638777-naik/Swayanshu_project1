@@ -2,6 +2,10 @@
 
 This runbook deploys the portal to one Ubuntu Linux VPS. Express serves the site and API privately inside Docker Compose; Caddy is the only public web service and terminates HTTPS. SQLite remains on a named Docker volume. Do not run multiple portal replicas.
 
+For a no-cost route using the same Compose stack, see
+[FREE_HOSTING_SQLITE.md](FREE_HOSTING_SQLITE.md). This runbook remains useful
+for any VPS, including an Oracle Cloud Always Free VM.
+
 ## 1. Prepare the VPS
 
 Create a supported Ubuntu VPS with a static public IP and SSH access. Point the domain's `A` record to that address. Add an `AAAA` record only if the VPS has working public IPv6. Wait for DNS to resolve before starting Caddy.
@@ -37,7 +41,11 @@ Do not publish port 5000 or expose the Docker daemon publicly.
 
 ## 2. Prepare Providers and Secrets
 
-In Resend, add and verify the sending domain. Publish the DNS records Resend requires and wait until the dashboard reports the domain as verified. The `OTP_FROM_EMAIL` address must use that verified domain.
+Choose Resend or Brevo SMTP for OTP delivery. With Resend, add and verify the
+sending domain, publish its DNS records, and set `OTP_DELIVERY_PROVIDER=resend`,
+`RESEND_API_KEY`, and `OTP_FROM_EMAIL`. With Brevo, verify a sender address and
+set `OTP_DELIVERY_PROVIDER=brevo-smtp`, `BREVO_SMTP_USER`, `BREVO_SMTP_KEY`, and
+`OTP_FROM_EMAIL`. The sender must be accepted by the selected provider.
 
 Create a private S3-compatible backup bucket. For Backblaze B2, create an application key restricted to that bucket with list, upload, and delete permissions. Record the bucket's S3 endpoint and region. Retention needs delete permission. Configure the AWS CLI outside the repository for backup verification and restore downloads, then restrict its credentials file:
 
@@ -66,7 +74,8 @@ Edit `.env` using a secure editor or secret manager. Replace every `CHANGE_ME` v
 - A unique random `JWT_SECRET` of at least 32 characters. Generate one with `openssl rand -base64 48`; do not paste it into chat, source files, or shell history.
 - Three distinct `DEFAULT_*_PASSWORD` values, each 12 to 72 UTF-8 bytes. Keep bootstrap passwords in a secret manager and change any bootstrap account password before use.
 - `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_NAME` for the first production administrator.
-- The verified `OTP_FROM_EMAIL` and Resend `RESEND_API_KEY`.
+- The selected provider credentials and verified `OTP_FROM_EMAIL`.
+- `OTP_EXPIRY_MINUTES` from 1 to 60; it defaults to 10.
 - `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`; keep the bucket private.
 - `BACKUP_INTERVAL_HOURS` and `BACKUP_RETENTION_DAYS` if the defaults (24 hours and 30 days) are not appropriate.
 
@@ -88,7 +97,11 @@ For a **fresh deployment only**, initialize the persistent SQLite volume with th
 docker compose run --rm --no-deps portal npm run seed
 ```
 
-Production seeding creates the initial administrator and Administration department only. It does not seed demo students, teachers, attendance, or marks. Do not use the local demo database for production; startup rejects known demo accounts. Seeding is insert-only and does not rotate existing passwords.
+Production seeding creates the initial administrator, academic catalog options,
+and Administration department. It does not seed demo students, teachers,
+attendance, or marks. Do not use the local demo database for production;
+startup rejects known demo accounts. Seeding is insert-only and does not rotate
+existing passwords.
 
 ## 4. Start and Check HTTPS
 

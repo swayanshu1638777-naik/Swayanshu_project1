@@ -1020,3 +1020,38 @@ body:has(.otp-card) {
     transition-duration: 0.01ms !important;
   }
 }
+
+.portal-account-dialog {
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border: 0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  color: #172033;
+  box-shadow: 0 20px 60px rgb(15 23 42 / 25%);
+}
+
+.portal-account-dialog::backdrop {
+  background: rgb(15 23 42 / 55%);
+}
+
+.portal-account-dialog h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.portal-dialog-message:empty {
+  display: none;
+}
+
+.portal-dialog-message {
+  margin: 0;
+  color: #991b1b;
+}
+
+.portal-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}

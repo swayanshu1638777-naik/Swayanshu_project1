@@ -18,6 +18,16 @@ const demoAccountEmails = [
   'ravi@ssipmt.com',
 ];
 
+function getOtpExpiryMinutes(env = process.env) {
+  const rawValue = env.OTP_EXPIRY_MINUTES;
+  if (rawValue == null || rawValue === '') return 10;
+  const minutes = Number(rawValue);
+  if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 60) {
+    throw new Error('OTP_EXPIRY_MINUTES must be an integer between 1 and 60');
+  }
+  return minutes;
+}
+
 function isExampleHostname(hostname) {
   return hostname === 'example.com'
     || hostname.endsWith('.example.com')
@@ -29,6 +39,7 @@ function isExampleHostname(hostname) {
 }
 
 function validateProductionRuntimeConfig(env) {
+  getOtpExpiryMinutes(env);
   if (env.TRUST_PROXY !== '1') {
     throw new Error('Set TRUST_PROXY=1 when running behind the single trusted Caddy proxy');
   }
@@ -60,12 +71,18 @@ function validateProductionRuntimeConfig(env) {
   }
 
   const otpProvider = env.OTP_DELIVERY_PROVIDER || (env.OTP_DELIVERY_URL ? 'webhook' : 'resend');
-  if (otpProvider === 'resend') {
+  if (otpProvider === 'resend' || otpProvider === 'brevo-smtp') {
     const fromEmail = env.OTP_FROM_EMAIL;
     const fromDomain = typeof fromEmail === 'string' ? fromEmail.split('@').at(-1) : '';
-    if (typeof env.RESEND_API_KEY !== 'string' || !env.RESEND_API_KEY.trim()
-        || env.RESEND_API_KEY.includes('CHANGE_ME')) {
-      throw new Error('Set RESEND_API_KEY before starting OTP delivery with Resend in production');
+    if (otpProvider === 'resend') {
+      if (typeof env.RESEND_API_KEY !== 'string' || !env.RESEND_API_KEY.trim()
+          || env.RESEND_API_KEY.includes('CHANGE_ME')) {
+        throw new Error('Set RESEND_API_KEY before starting OTP delivery with Resend in production');
+      }
+    } else if (typeof env.BREVO_SMTP_USER !== 'string' || !env.BREVO_SMTP_USER.trim()
+        || typeof env.BREVO_SMTP_KEY !== 'string' || !env.BREVO_SMTP_KEY.trim()
+        || env.BREVO_SMTP_USER.includes('CHANGE_ME') || env.BREVO_SMTP_KEY.includes('CHANGE_ME')) {
+      throw new Error('Set BREVO_SMTP_USER and BREVO_SMTP_KEY before starting OTP delivery with Brevo SMTP in production');
     }
     if (typeof fromEmail !== 'string' || fromEmail.startsWith('CHANGE_ME')
       || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)
@@ -83,7 +100,7 @@ function validateProductionRuntimeConfig(env) {
       throw new Error('OTP_DELIVERY_URL must be a trusted HTTPS delivery endpoint before starting in production');
     }
   } else {
-    throw new Error('OTP_DELIVERY_PROVIDER must be either resend or webhook');
+    throw new Error('OTP_DELIVERY_PROVIDER must be resend, brevo-smtp, or webhook');
   }
   getProductionSeedPasswords(env);
 }
@@ -136,6 +153,7 @@ function assertNoDemoSeedAccounts(db) {
 
 module.exports = {
   assertNoDemoSeedAccounts,
+  getOtpExpiryMinutes,
   getProductionAdminConfig,
   getProductionSeedPasswords,
   validateProductionRuntimeConfig,

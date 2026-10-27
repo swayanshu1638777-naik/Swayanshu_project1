@@ -68,6 +68,12 @@ async function api(endpoint, { token = adminToken, method = 'GET', body } = {}) 
   return { response, result: text ? JSON.parse(text) : undefined };
 }
 
+async function csvRequest(endpoint, token) {
+  return fetch(`${baseUrl}${endpoint}`, {
+    headers: token ? { authorization: `Bearer ${token}`, accept: 'text/csv' } : { accept: 'text/csv' },
+  });
+}
+
 test('data endpoints require an administrator and counts include major tables', async () => {
   assert.equal((await api('/admin/data/counts', { token: null })).response.status, 401);
   assert.equal((await api('/admin/data/counts', { token: teacherToken })).response.status, 403);
@@ -111,22 +117,32 @@ test('admin can edit records and invalid relationships are rejected', async () =
   assert.equal(relation.response.status, 400);
 });
 
+test('student registration catalog is public and contains displayable academic choices', async () => {
+  const result = await api('/catalog', { token: null });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.result.departments[0].name, 'Engineering');
+  assert.equal(result.result.branches[0].code, 'COMP');
+  assert.equal(result.result.sections[0].name, 'A');
+});
+
 test('CSV export includes all filtered records and guards spreadsheet formulas', async () => {
   await api(`/admin/data/students/${studentId}`, { method: 'PATCH', body: { name: '=HYPERLINK("x")' } });
-  const csv = await fetch(`${baseUrl}/admin/data/students?format=csv&all=true`, {
-    headers: { authorization: `Bearer ${adminToken}` },
-  });
-
-  test('student registration catalog is public and contains displayable academic choices', async () => {
-    const result = await api('/catalog', { token: null });
-    assert.equal(result.response.status, 200);
-    assert.equal(result.result.departments[0].name, 'Engineering');
-    assert.equal(result.result.branches[0].code, 'COMP');
-    assert.equal(result.result.sections[0].name, 'A');
-  });
+  const csv = await csvRequest('/admin/data/students?format=csv&all=true', adminToken);
   assert.equal(csv.status, 200);
   assert.match(csv.headers.get('content-type'), /text\/csv/);
-  assert.match(await csv.text(), /'=HYPERLINK/);
+  assert.match(csv.headers.get('content-disposition'), /attachment;\s*filename="?students\.csv"?/i);
+  const csvBytes = Buffer.from(await csv.arrayBuffer());
+  assert.deepEqual([...csvBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+  const contents = csvBytes.subarray(3).toString('utf8');
+  assert.match(contents, /'=HYPERLINK/);
+
+  const filtered = await csvRequest(`/admin/data/students?format=csv&all=true&q=D101&branch_id=${branchId}`, adminToken);
+  assert.equal(filtered.status, 200);
+  const filteredContents = await filtered.text();
+  assert.match(filteredContents, /D101/);
+  assert.doesNotMatch(filteredContents, /D102/);
+  assert.equal((await csvRequest('/admin/data/students?format=csv', null)).status, 401);
+  assert.equal((await csvRequest('/admin/data/students?format=csv', teacherToken)).status, 403);
   await api(`/admin/data/students/${studentId}`, { method: 'PATCH', body: { name: 'Edited Student' } });
 });
 

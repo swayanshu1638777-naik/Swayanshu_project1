@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const express = require('express');
 const { allowRoles } = require('../middleware/auth');
-const { HttpError, asyncRoute, pagination, positiveId, requiredText } = require('../utils/http');
+const { HttpError, asyncRoute, pagination, positiveId, requiredPassword, requiredText } = require('../utils/http');
 
 const router = express.Router();
 router.use(allowRoles('Admin'));
@@ -11,8 +11,12 @@ function insertUser(db, body, role) {
   const name = requiredText(body.name || body.full_name, 'name');
   const email = requiredText(body.email, 'email', 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'email must be valid');
-  const pass = body.password || process.env[`DEFAULT_${role.toUpperCase()}_PASSWORD`] || 'ChangeMe123!';
-  if (typeof pass !== 'string' || pass.length < 8 || pass.length > 128) throw new HttpError(400, 'password must contain 8 to 128 characters');
+  const pass = requiredPassword(body.password);
+  if (pass.length < 8) throw new HttpError(400, 'password must contain at least 8 characters');
+  const phone = body.phone == null || body.phone === '' ? null : body.phone;
+  if (phone != null && (typeof phone !== 'string' || !/^\d{10}$/.test(phone))) {
+    throw new HttpError(400, 'phone must contain exactly 10 digits');
+  }
   const departmentId = positiveId(body.department_id, 'department_id');
   const branchId = body.branch_id == null ? null : positiveId(body.branch_id, 'branch_id');
   const semesterId = body.semester_id == null ? null : positiveId(body.semester_id, 'semester_id');
@@ -34,7 +38,7 @@ function insertUser(db, body, role) {
     INSERT INTO users(username, email, roll_no, full_name, role, password_hash, phone,
                       department_id, branch_id, semester_id, section_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(username, email, rollNo, name, role, hash, body.phone || null,
+  `).run(username, email, rollNo, name, role, hash, phone,
     departmentId, branchId, semesterId, sectionId);
   return db.prepare(`
     SELECT id, username, email, roll_no, full_name AS name, role, phone,
@@ -60,7 +64,10 @@ function updateUser(db, id, body, role) {
     section_id: body.section_id === undefined ? current.section_id : body.section_id == null ? null : positiveId(body.section_id, 'section_id'),
   };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next.email)) throw new HttpError(400, 'email must be valid');
-  if (next.phone != null && (typeof next.phone !== 'string' || next.phone.length > 20)) throw new HttpError(400, 'phone must be at most 20 characters');
+  if (next.phone === '') next.phone = null;
+  if (next.phone != null && (typeof next.phone !== 'string' || !/^\d{10}$/.test(next.phone))) {
+    throw new HttpError(400, 'phone must contain exactly 10 digits');
+  }
   if (!db.prepare('SELECT 1 FROM departments WHERE id = ?').get(next.department_id)) throw new HttpError(400, 'department_id does not exist');
   if (role === 'Student' && (!next.branch_id || !next.semester_id || !next.section_id)) {
     throw new HttpError(400, 'Students require branch_id, semester_id, and section_id');
@@ -244,7 +251,7 @@ router.patch('/users/:id/status', (req, res) => {
 });
 router.post('/users/:id/password', (req, res) => {
   const id = positiveId(req.params.id);
-  const password = requiredText(req.body.password, 'password', 128);
+  const password = requiredPassword(req.body.password);
   if (password.length < 8) throw new HttpError(400, 'password must contain at least 8 characters');
   const result = req.db.prepare("UPDATE users SET password_hash = ? WHERE id = ? AND role != 'Admin'")
     .run(bcrypt.hashSync(password, 12), id);

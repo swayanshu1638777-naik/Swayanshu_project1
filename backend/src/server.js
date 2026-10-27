@@ -3,10 +3,12 @@ const { createApp } = require('./app');
 const { getDatabase } = require('./database');
 const {
   assertNoDemoSeedAccounts,
+  getOtpExpiryMinutes,
   validateProductionRuntimeConfig,
 } = require('./utils/productionConfig');
 const path = require('node:path');
 
+getOtpExpiryMinutes(process.env);
 if (process.env.NODE_ENV === 'production') validateProductionRuntimeConfig(process.env);
 
 const port = Number(process.env.PORT) || 5000;

@@ -20,10 +20,12 @@ services:
       DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?Set a unique production admin seed password}
       DEFAULT_TEACHER_PASSWORD: ${DEFAULT_TEACHER_PASSWORD:?Set a unique production teacher seed password}
       DEFAULT_STUDENT_PASSWORD: ${DEFAULT_STUDENT_PASSWORD:?Set a unique production student seed password}
-      OTP_DELIVERY_PROVIDER: resend
+      OTP_DELIVERY_PROVIDER: ${OTP_DELIVERY_PROVIDER:-resend}
       OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-10}
-      RESEND_API_KEY: ${RESEND_API_KEY:?Set the production Resend API key}
       OTP_FROM_EMAIL: ${OTP_FROM_EMAIL:?Set the sender address on a verified domain}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      BREVO_SMTP_USER: ${BREVO_SMTP_USER:-}
+      BREVO_SMTP_KEY: ${BREVO_SMTP_KEY:-}
     volumes:
       - portal-data:/app/data
       - portal-backups:/app/backups

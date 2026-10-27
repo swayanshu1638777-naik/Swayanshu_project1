@@ -1,6 +1,6 @@
 const express = require('express');
 const { allowRoles } = require('../middleware/auth');
-const { HttpError, positiveId, requiredText } = require('../utils/http');
+const { HttpError, isValidDate, positiveId, requiredText } = require('../utils/http');
 
 const router = express.Router();
 router.use(allowRoles('Admin'));
@@ -23,7 +23,7 @@ const resources = {
     role: 'Student',
     order: 'u.roll_no, u.id',
     editable: {
-      name: ['full_name', 'text'], email: ['email', 'email'], phone: ['phone', 'nullableText'],
+      name: ['full_name', 'text'], email: ['email', 'email'], phone: ['phone', 'phone'],
       department_id: ['department_id', 'id'], branch_id: ['branch_id', 'nullableId'],
       semester_id: ['semester_id', 'nullableId'], section_id: ['section_id', 'nullableId'],
       is_active: ['is_active', 'boolean'],
@@ -36,7 +36,7 @@ const resources = {
       u.department_id, u.is_active, u.created_at`,
     search: ['u.full_name', 'u.email', 'u.username'], role: 'Teacher', order: 'u.full_name, u.id',
     editable: {
-      name: ['full_name', 'text'], email: ['email', 'email'], phone: ['phone', 'nullableText'],
+      name: ['full_name', 'text'], email: ['email', 'email'], phone: ['phone', 'phone'],
       department_id: ['department_id', 'id'], is_active: ['is_active', 'boolean'],
     },
   },
@@ -205,7 +205,7 @@ function queryParts(resource, query) {
     for (const [name, operator] of [['date_from', '>=' ], ['date_to', '<=']]) {
       if (query[name]) {
         const date = String(query[name]);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+        if (!isValidDate(date)) {
           throw new HttpError(400, `${name} must be a valid YYYY-MM-DD date`);
         }
         filters.push(`${resource.dateColumn} ${operator} ?`);
@@ -243,9 +243,9 @@ function parseField(db, type, value, field) {
     if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) throw new HttpError(400, `${field} must be a valid email`);
     return type === 'code' ? text.toUpperCase() : type === 'email' ? text.toLowerCase() : text;
   }
-  if (type === 'nullableText') {
+  if (type === 'phone') {
     if (value == null || value === '') return null;
-    if (typeof value !== 'string' || value.length > 20) throw new HttpError(400, `${field} must be at most 20 characters`);
+    if (typeof value !== 'string' || !/^\d{10}$/.test(value)) throw new HttpError(400, `${field} must contain exactly 10 digits`);
     return value;
   }
   if (type === 'id' || type === 'nullableId') {
@@ -268,7 +268,7 @@ function parseField(db, type, value, field) {
   }
   if (type === 'date') {
     const date = requiredText(value, field, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) throw new HttpError(400, `${field} must be a valid YYYY-MM-DD date`);
+    if (!isValidDate(date)) throw new HttpError(400, `${field} must be a valid YYYY-MM-DD date`);
     return date;
   }
   if (type === 'maxMarks' || type === 'score') {

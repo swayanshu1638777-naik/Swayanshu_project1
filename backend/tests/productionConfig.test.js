@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const {
   assertNoDemoSeedAccounts,
+  getOtpExpiryMinutes,
   getProductionAdminConfig,
   getProductionSeedPasswords,
   validateProductionRuntimeConfig,
@@ -30,6 +31,15 @@ const validAdminConfig = {
   INITIAL_ADMIN_EMAIL: 'portal-admin@college.test',
   INITIAL_ADMIN_NAME: 'College Portal Administrator',
 };
+
+test('OTP expiry configuration defaults safely and rejects invalid durations', () => {
+  assert.equal(getOtpExpiryMinutes({}), 10);
+  assert.equal(getOtpExpiryMinutes({ OTP_EXPIRY_MINUTES: '1' }), 1);
+  assert.equal(getOtpExpiryMinutes({ OTP_EXPIRY_MINUTES: '60' }), 60);
+  for (const value of ['0', '-1', '61', '1.5', 'not-a-number']) {
+    assert.throws(() => getOtpExpiryMinutes({ OTP_EXPIRY_MINUTES: value }), /between 1 and 60/);
+  }
+});
 
 test('production runtime accepts strong JWT secret and explicit trusted CORS origins', () => {
   assert.doesNotThrow(() => validateProductionRuntimeConfig(validRuntimeConfig));
@@ -137,6 +147,26 @@ test('production runtime validates the Resend email adapter configuration', () =
   }), /OTP_DELIVERY_PROVIDER/);
 });
 
+test('production runtime validates Brevo SMTP credentials and sender', () => {
+  const brevoConfig = {
+    ...validRuntimeConfig,
+    OTP_DELIVERY_PROVIDER: 'brevo-smtp',
+    BREVO_SMTP_USER: 'test-smtp-user',
+    BREVO_SMTP_KEY: 'test-smtp-key',
+    OTP_FROM_EMAIL: 'portal@college.test',
+  };
+  delete brevoConfig.OTP_DELIVERY_URL;
+  assert.doesNotThrow(() => validateProductionRuntimeConfig(brevoConfig));
+  assert.throws(() => validateProductionRuntimeConfig({
+    ...brevoConfig,
+    BREVO_SMTP_KEY: '',
+  }), /BREVO_SMTP_USER and BREVO_SMTP_KEY/);
+  assert.throws(() => validateProductionRuntimeConfig({
+    ...brevoConfig,
+    OTP_FROM_EMAIL: 'portal@example.com',
+  }), /OTP_FROM_EMAIL/);
+});
+
 test('production seed requires distinct explicit passwords within bcrypt byte limits', () => {
   assert.deepEqual(getProductionSeedPasswords(validSeedPasswords), validSeedPasswords);
   assert.throws(() => getProductionSeedPasswords({
@@ -190,7 +220,7 @@ test('production runtime rejects a database containing development seed accounts
   }
 });
 
-test('production seed creates only its configured administrator and no demo accounts', async () => {
+test('production seed creates its administrator and registration catalog without demo accounts', async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'smart-college-seed-'));
   const databasePath = path.join(tempDir, 'production.sqlite');
   const backendDir = path.resolve(__dirname, '..');
@@ -220,6 +250,10 @@ test('production seed creates only its configured administrator and no demo acco
         email: validAdminConfig.INITIAL_ADMIN_EMAIL,
         role: 'Admin',
       }]);
+      assert.equal(db.prepare('SELECT COUNT(*) AS count FROM departments').get().count, 5);
+      assert.equal(db.prepare('SELECT COUNT(*) AS count FROM branches').get().count, 6);
+      assert.equal(db.prepare('SELECT COUNT(*) AS count FROM semesters').get().count, 8);
+      assert.equal(db.prepare('SELECT COUNT(*) AS count FROM sections').get().count, 49);
       assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attendance').get().count, 0);
       assert.equal(db.prepare('SELECT COUNT(*) AS count FROM marks').get().count, 0);
       assert.doesNotThrow(() => assertNoDemoSeedAccounts(db));
